@@ -1,0 +1,720 @@
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+lib/
+  assets/
+    favicon.svg
+  components/
+    ProductCard.svelte
+    ProductGrid.svelte
+    SidebarNav.svelte
+  data/
+    products.js
+  index.js
+routes/
+  [id]/
+    +page.svelte
+  +layout.svelte
+  +page.svelte
+  layout.css
+app.html
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path="lib/assets/favicon.svg">
+<svg xmlns="http://www.w3.org/2000/svg" width="107" height="128" viewBox="0 0 107 128"><title>svelte-logo</title><path d="M94.157 22.819c-10.4-14.885-30.94-19.297-45.792-9.835L22.282 29.608A29.92 29.92 0 0 0 8.764 49.65a31.5 31.5 0 0 0 3.108 20.231 30 30 0 0 0-4.477 11.183 31.9 31.9 0 0 0 5.448 24.116c10.402 14.887 30.942 19.297 45.791 9.835l26.083-16.624A29.92 29.92 0 0 0 98.235 78.35a31.53 31.53 0 0 0-3.105-20.232 30 30 0 0 0 4.474-11.182 31.88 31.88 0 0 0-5.447-24.116" style="fill:#ff3e00"/><path d="M45.817 106.582a20.72 20.72 0 0 1-22.237-8.243 19.17 19.17 0 0 1-3.277-14.503 18 18 0 0 1 .624-2.435l.49-1.498 1.337.981a33.6 33.6 0 0 0 10.203 5.098l.97.294-.09.968a5.85 5.85 0 0 0 1.052 3.878 6.24 6.24 0 0 0 6.695 2.485 5.8 5.8 0 0 0 1.603-.704L69.27 76.28a5.43 5.43 0 0 0 2.45-3.631 5.8 5.8 0 0 0-.987-4.371 6.24 6.24 0 0 0-6.698-2.487 5.7 5.7 0 0 0-1.6.704l-9.953 6.345a19 19 0 0 1-5.296 2.326 20.72 20.72 0 0 1-22.237-8.243 19.17 19.17 0 0 1-3.277-14.502 17.99 17.99 0 0 1 8.13-12.052l26.081-16.623a19 19 0 0 1 5.3-2.329 20.72 20.72 0 0 1 22.237 8.243 19.17 19.17 0 0 1 3.277 14.503 18 18 0 0 1-.624 2.435l-.49 1.498-1.337-.98a33.6 33.6 0 0 0-10.203-5.1l-.97-.294.09-.968a5.86 5.86 0 0 0-1.052-3.878 6.24 6.24 0 0 0-6.696-2.485 5.8 5.8 0 0 0-1.602.704L37.73 51.72a5.42 5.42 0 0 0-2.449 3.63 5.79 5.79 0 0 0 .986 4.372 6.24 6.24 0 0 0 6.698 2.486 5.8 5.8 0 0 0 1.602-.704l9.952-6.342a19 19 0 0 1 5.295-2.328 20.72 20.72 0 0 1 22.237 8.242 19.17 19.17 0 0 1 3.277 14.503 18 18 0 0 1-8.13 12.053l-26.081 16.622a19 19 0 0 1-5.3 2.328" style="fill:#fff"/></svg>
+</file>
+
+<file path="lib/components/ProductCard.svelte">
+<!-- ProductCard.svelte -->
+<script>
+  // Destructure implicit props with fallback initializers in Svelte 5
+  let { 
+    product, 
+    isFavorited = false, 
+    onCardClick, 
+    onToggleFavorite, 
+    onAddToCart 
+  } = $props();
+
+  // Local UI-only element state
+  let isLoaded = $state(false);
+
+  // Derived calculation matching your formatting logic
+  let discountPercentage = $derived(
+    product.originalPrice > product.price 
+      ? Math.round((1 - product.price / product.originalPrice) * 100) 
+      : 0
+  );
+</script>
+
+<button 
+  onclick={() => onCardClick?.(product)}
+  class="bg-white rounded-2xl border border-slate-200/70 hover:border-slate-300 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col justify-between overflow-hidden group text-left w-full focus:outline-none"
+>
+  <!-- Image Region -->
+  <div class="relative w-full aspect-[4/3] bg-slate-50 overflow-hidden border-b border-slate-100">
+    <!-- Blur Placeholder -->
+    <img 
+      src={product.placeholder} 
+      alt="" 
+      aria-hidden="true" 
+      class="absolute inset-0 w-full h-full object-cover blur-md transition-opacity duration-300
+        {isLoaded ? 'opacity-0' : 'opacity-100'}"
+    />
+    <!-- Lazy Image Asset -->
+    <img 
+      src={product.images[0]} 
+      alt={product.name}
+      loading="lazy"
+      onload={() => isLoaded = true}
+      class="w-full h-full object-cover transition-all duration-500 group-hover:scale-103
+        {isLoaded ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}"
+    />
+
+    <!-- Glass Heart Toggle -->
+    <div 
+      onclick={(e) => { e.stopPropagation(); onToggleFavorite?.(product.id); }}
+      class="absolute top-3.5 right-3.5 z-10 w-8 h-8 rounded-full bg-white/80 backdrop-blur-sm shadow-sm hover:bg-white flex items-center justify-center border border-slate-200/40 text-slate-400 hover:text-red-600 transition-colors focus:outline-none"
+      aria-label="Favorite product"
+    >
+      <svg class="w-4 h-4 {isFavorited ? 'fill-red-600 stroke-red-600' : 'stroke-slate-500'}" fill="none" stroke-width="2.5" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>
+      </svg>
+    </div>
+  </div>
+
+  <!-- Details portion -->
+  <div class="p-5 flex-1 flex flex-col justify-between space-y-4 w-full">
+    <div class="space-y-2">
+      <span class="bg-slate-100 text-slate-700 text-[9px] font-extrabold px-2 py-0.5 rounded uppercase tracking-wider">
+        {product.badge}
+      </span>
+
+      <div class="flex items-center gap-2">
+        <span class="text-xl font-black text-slate-900 tracking-tight">
+          {product.price.toLocaleString()} UGX
+        </span>
+        {#if discountPercentage > 0}
+          <span class="text-xs text-slate-400 line-through font-medium">
+            {product.originalPrice.toLocaleString()}
+          </span>
+          <span class="text-[10px] text-red-600 bg-red-50 font-black px-1.5 py-0.5 rounded">
+            -{discountPercentage}%
+          </span>
+        {/if}
+      </div>
+
+      <h4 class="text-sm font-bold text-slate-800 line-clamp-2 leading-relaxed">
+        {product.name}
+      </h4>
+      <p class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">by {product.seller}</p>
+    </div>
+
+    <div class="space-y-4 pt-1">
+      <div class="flex items-center justify-between text-xs">
+        <div class="flex items-center gap-1 font-bold text-slate-700">
+          <svg class="w-3.5 h-3.5 text-amber-500 fill-current" viewBox="0 0 20 20">
+            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+          </svg>
+          <span>{product.rating}</span>
+          <span class="text-slate-400 font-normal">({product.reviews})</span>
+        </div>
+        
+        <span class="text-[11px] font-extrabold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">
+          {product.stockStatus}
+        </span>
+      </div>
+
+      <div 
+        onclick={(e) => { e.stopPropagation(); onAddToCart?.(product); }}
+        class="w-full border-2 border-slate-200 hover:border-slate-900 hover:bg-slate-900 hover:text-white text-slate-800 text-xs font-bold py-2.5 rounded-xl transition-all duration-200 flex items-center justify-center gap-1.5 focus:outline-none"
+      >
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+        </svg>
+        <span>Add to Cart</span>
+      </div>
+    </div>
+  </div>
+</button>
+</file>
+
+<file path="lib/components/ProductGrid.svelte">
+<!-- ProductGrid.svelte -->
+<script>
+  import ProductCard from './ProductCard.svelte';
+
+  let { 
+    products = [], 
+    favoritedMap = {}, 
+    title = "Current Catalog Offerings",
+    onProductSelect,
+    onToggleFavorite,
+    onAddToCart
+  } = $props();
+</script>
+
+<div class="space-y-8">
+  <section class="space-y-6">
+    <div class="flex justify-between items-baseline border-b border-slate-200 pb-2">
+      <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest">
+        {title}
+      </h3>
+      <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+        Showing {products.length} items
+      </p>
+    </div>
+
+    {#if products.length === 0}
+      <div class="p-12 text-center bg-slate-50 border border-dashed border-slate-200 rounded-2xl">
+        <p class="text-sm font-bold text-slate-500">No matching items located in this sector.</p>
+      </div>
+    {:else}
+      <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6 max-w-7xl">
+        {#each products as product (product.id)}
+          <ProductCard 
+            {product}
+            isFavorited={!!favoritedMap[product.id]}
+            onCardClick={onProductSelect}
+            {onToggleFavorite}
+            {onAddToCart}
+          />
+        {/each}
+      </div>
+    {/if}
+  </section>
+</div>
+</file>
+
+<file path="lib/components/SidebarNav.svelte">
+<!-- SidebarNav.svelte -->
+<script>
+  let { 
+    selectedCategory = "All", 
+    fulfillmentMode = "pickup",
+    onCategoryChange,
+    onFulfillmentChange
+  } = $props();
+
+  const categories = [
+    { id: "All", label: "Explore All", icon: "M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" },
+    { id: "Agro Products", label: "Agro Products", icon: "M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m0-12.728l.707.707m12.728 12.728l.707-.707M21 12a9 9 0 11-18 0 9 9 0 0118 0z" },
+    { id: "Food & Beverages", label: "Food & Beverages", icon: "M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" },
+    { id: "Arts & Crafts", label: "Arts & Crafts", icon: "M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" }
+  ];
+</script>
+
+<aside class="hidden lg:flex w-64 bg-slate-50/50 border-r border-slate-200 flex-col justify-between p-5 flex-shrink-0">
+  <div class="space-y-6">
+    
+    <!-- Fulfillment Toggle -->
+    <div class="bg-slate-200/80 p-1 rounded-xl flex">
+      <button 
+        onclick={() => onFulfillmentChange?.('delivery')}
+        class="flex-1 py-1.5 text-xs font-bold rounded-lg transition-all text-center
+          {fulfillmentMode === 'delivery' ? 'bg-white text-slate-950 shadow-sm' : 'text-slate-500 hover:text-slate-800'}"
+      >
+        Delivery
+      </button>
+      <button 
+        onclick={() => onFulfillmentChange?.('pickup')}
+        class="flex-1 py-1.5 text-xs font-bold rounded-lg transition-all text-center
+          {fulfillmentMode === 'pickup' ? 'bg-white text-slate-950 shadow-sm' : 'text-slate-500 hover:text-slate-800'}"
+      >
+        Post Pickup
+      </button>
+    </div>
+
+    <!-- Navigation Anchor Links -->
+    <nav class="space-y-1.5" aria-label="Sidebar main navigation">
+      {#each categories as cat}
+        <button 
+          onclick={() => onCategoryChange?.(cat.id)}
+          class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold transition-all
+            {selectedCategory === cat.id ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-200/50 hover:text-slate-950'}"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d={cat.icon}/>
+          </svg>
+          <span>{cat.label}</span>
+        </button>
+      {/each}
+    </nav>
+  </div>
+
+  <div class="bg-slate-200/50 p-4 rounded-2xl border border-slate-200 flex-shrink-0">
+    <p class="text-[10px] font-black tracking-wider text-slate-400 uppercase">Vendor Access</p>
+    <p class="text-xs text-slate-600 font-bold mt-1">Sell on Postcom to reach national buyers.</p>
+    <a href="#register" class="text-xs text-red-600 font-black hover:underline mt-2 inline-block">Enroll Shop →</a>
+  </div>
+</aside>
+</file>
+
+<file path="lib/data/products.js">
+// src/lib/data/products.js
+export const products = [
+  {
+    id: 1,
+    name: "Sipi Falls Arabica Coffee (Medium Roast, 500g)",
+    category: "Agro Products",
+    price: 24500,
+    originalPrice: 28000,
+    rating: 4.8,
+    reviews: 142,
+    seller: "Sipi Falls Growers Co-op",
+    badge: "In Season",
+    stockStatus: "Many in stock",
+    origin: "Kapchorwa District, Mount Elgon",
+    altitude: "1,800m ASL",
+    process: "Fully Washed",
+    description: "Sourced directly from the volcanic slopes of Mount Elgon, this premium Arabica features a balanced, medium roast profile with prominent notes of stone fruit, brown sugar, and a crisp, clean citrus finish.",
+    images: [
+      "https://images.unsplash.com/photo-1559056199-641a0ac8b55e?auto=format&fit=crop&q=80&w=600",
+      "https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?auto=format&fit=crop&q=80&w=600",
+      "https://images.unsplash.com/photo-1447933601403-0c6688de566e?auto=format&fit=crop&q=80&w=600"
+    ],
+    placeholder: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'><rect width='100%' height='100%' fill='%23f1f5f9'/></svg>"
+  },
+  {
+    id: 2,
+    name: "Equator Composite Cassava-Millet Flour (2kg Pack)",
+    category: "Agro Products",
+    price: 9500,
+    originalPrice: 11000,
+    rating: 4.5,
+    reviews: 58,
+    seller: "Equator Millers Ltd",
+    badge: "Staple Feed",
+    stockStatus: "Many in stock",
+    origin: "Kumi District, Eastern Uganda",
+    altitude: "1,100m ASL",
+    process: "Sun-Dried & Stone-Ground",
+    description: "A traditional blend of indigenous sweet cassava and finger millet. Rich in nutrients, stone-ground to preserve natural fibers, and perfect for preparing high-energy traditional meals.",
+    images: [
+      "https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&q=80&w=600",
+      "https://images.unsplash.com/photo-1574362848149-11496d93a7c7?auto=format&fit=crop&q=80&w=600"
+    ],
+    placeholder: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'><rect width='100%' height='100%' fill='%23f1f5f9'/></svg>"
+  },
+  {
+    id: 3,
+    name: "Organic Busoga Forest Honey (Raw & Unprocessed, 1L)",
+    category: "Food & Beverages",
+    price: 18000,
+    originalPrice: 22000,
+    rating: 4.9,
+    reviews: 95,
+    seller: "Busoga Bee Keepers",
+    badge: "Best Seller",
+    stockStatus: "Many in stock",
+    origin: "Kamuli, Busoga Region",
+    altitude: "1,050m ASL",
+    process: "Cold-Pressed Centrifuged",
+    description: "Raw, unpasteurized honey harvested wild from multi-floral forest canopies in Busoga. Completely free of additives, yielding a deep amber consistency with a complex, woody herbal sweetness.",
+    images: [
+      "https://images.unsplash.com/photo-1587049352846-4a222e784d38?auto=format&fit=crop&q=80&w=600",
+      "https://images.unsplash.com/photo-1471193945509-9ad0617afabf?auto=format&fit=crop&q=80&w=600"
+    ],
+    placeholder: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'><rect width='100%' height='100%' fill='%23f1f5f9'/></svg>"
+  },
+  {
+    id: 4,
+    name: "Handmade Barkcloth Tote Bag (Classic Tan Leather)",
+    category: "Arts & Crafts",
+    price: 65000,
+    originalPrice: 75000,
+    rating: 4.7,
+    reviews: 34,
+    seller: "Kampala Artisans Guild",
+    badge: "Limited Run",
+    stockStatus: "Only 3 left",
+    origin: "Bukomansimbi District",
+    altitude: "1,250m ASL",
+    process: "Mutuba Tree Beat-Sourcing",
+    description: "Crafted using ancient UNESCO-recognized Mutuba barkcloth techniques. Reinforced with genuine Ugandan tan leather detailing to deliver a highly durable, structured, and culturally historical accessory.",
+    images: [
+      "https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&q=80&w=600",
+      "https://images.unsplash.com/photo-1524498250077-390f9e378fc0?auto=format&fit=crop&q=80&w=600"
+    ],
+    placeholder: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'><rect width='100%' height='100%' fill='%23f1f5f9'/></svg>"
+  }
+];
+</file>
+
+<file path="lib/index.js">
+// place files you want to import through the `$lib` alias in this folder.
+</file>
+
+<file path="routes/[id]/+page.svelte">
+<!-- routes/[id]/+page.svelte -->
+<script>
+  import { page } from '$app/state';
+  import { products } from '$lib/data/products.js';
+
+  let { ...layoutProps } = $props();
+
+  // Route extraction parsing via SvelteKit functional routing state
+  let productId = $derived(Number(page.params.id));
+  let product = $derived(products.find(p => p.id === productId));
+
+  // Local details management runes
+  let selectedThumbnailIndex = $state(0);
+  let selectedFulfillment = $state("pickup");
+  let quantity = $state(1);
+</script>
+
+{#if product}
+  <div class="space-y-6">
+    <!-- Breadcrumbs Back Navigation Bar -->
+    <nav class="flex items-center justify-between text-xs font-semibold text-slate-500 border-b border-slate-100 pb-4">
+      <div class="flex items-center gap-2">
+        <a href="/" class="hover:text-slate-900 transition-colors">Catalog</a>
+        <span>/</span>
+        <span class="text-slate-400 font-medium">{product.category}</span>
+        <span>/</span>
+        <span class="text-slate-900 font-bold truncate max-w-[200px] sm:max-w-none">{product.name}</span>
+      </div>
+      <a href="/" class="flex items-center gap-1 text-red-600 hover:text-red-700 transition-colors">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
+        </svg>
+        <span>Back to Listings</span>
+      </a>
+    </nav>
+
+    <!-- Main Split Grid Grid Layout -->
+    <div class="grid grid-cols-1 xl:grid-cols-12 gap-8">
+      
+      <!-- LEFT GALLERY MODULE -->
+      <div class="xl:col-span-5 space-y-4">
+        <div class="relative w-full aspect-square bg-slate-50 border border-slate-200/60 rounded-2xl overflow-hidden shadow-sm">
+          <img 
+            src={product.images[selectedThumbnailIndex]} 
+            alt={product.name}
+            class="w-full h-full object-cover"
+          />
+          <div class="absolute top-4 left-4 z-10 flex flex-col gap-1.5">
+            <span class="bg-slate-900 text-white text-[9px] font-black px-2.5 py-1 rounded shadow-sm uppercase tracking-wider">
+              {product.badge}
+            </span>
+          </div>
+        </div>
+
+        <!-- Thumbnail Selection Carousel -->
+        <div class="flex gap-2.5 overflow-x-auto pb-1">
+          {#each product.images as img, index}
+            <button 
+              onclick={() => selectedThumbnailIndex = index}
+              class="w-16 h-16 rounded-xl overflow-hidden border-2 bg-slate-50 flex-shrink-0 transition-all
+                {selectedThumbnailIndex === index ? 'border-slate-900 shadow' : 'border-slate-200 hover:border-slate-300'}"
+            >
+              <img src={img} alt="" class="w-full h-full object-cover"/>
+            </button>
+          {/each}
+        </div>
+      </div>
+
+      <!-- RIGHT LOGISTICS & CONTENT ACTION RENDERER -->
+      <div class="xl:col-span-7 space-y-6">
+        <div class="space-y-2">
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-bold text-red-600 uppercase tracking-widest">{product.category}</span>
+            <span class="text-slate-300">•</span>
+            <span class="text-xs text-slate-500 font-semibold">By {product.seller}</span>
+          </div>
+          <h1 class="text-xl sm:text-2xl font-black text-slate-900 leading-tight">{product.name}</h1>
+          <p class="text-xs text-slate-600 leading-relaxed pt-2">{product.description}</p>
+        </div>
+
+        <!-- Calculated Price Container -->
+        <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200/60 flex items-center justify-between">
+          <div>
+            <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Price Point</p>
+            <span class="text-2xl font-black text-slate-900">{product.price.toLocaleString()} UGX</span>
+          </div>
+          <span class="text-xs font-bold text-emerald-600 bg-emerald-50 px-3 py-1 rounded">{product.stockStatus}</span>
+        </div>
+
+        <!-- Fulfillment Routing Options -->
+        <div class="space-y-3">
+          <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest">Select Courier Route</h3>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <button 
+              onclick={() => selectedFulfillment = "pickup"}
+              class="text-left p-4 rounded-2xl border-2 transition-all flex flex-col justify-between space-y-3
+                {selectedFulfillment === 'pickup' ? 'border-slate-900 bg-slate-900/5' : 'border-slate-200 bg-white'}"
+            >
+              <span class="text-xs font-extrabold text-slate-900 uppercase">Post Office Pickup</span>
+              <p class="text-[11px] text-slate-500">Pick up tomorrow morning safely with <strong>Free Delivery</strong>.</p>
+            </button>
+
+            <button 
+              onclick={() => selectedFulfillment = "delivery"}
+              class="text-left p-4 rounded-2xl border-2 transition-all flex flex-col justify-between space-y-3
+                {selectedFulfillment === 'delivery' ? 'border-slate-900 bg-slate-900/5' : 'border-slate-200 bg-white'}"
+            >
+              <span class="text-xs font-extrabold text-slate-900 uppercase">Home Delivery</span>
+              <p class="text-[11px] text-slate-500">Direct transit processing route dispatched straight to your door.</p>
+            </button>
+          </div>
+        </div>
+
+        <!-- Quantitative Actions -->
+        <div class="flex items-center gap-4 pt-4">
+          <div class="flex items-center border-2 border-slate-200 rounded-xl overflow-hidden h-11 bg-white">
+            <button onclick={() => quantity = Math.max(1, quantity - 1)} class="px-3 hover:bg-slate-50 font-bold text-sm">-</button>
+            <span class="w-10 text-center text-xs font-black">{quantity}</span>
+            <button onclick={() => quantity++} class="px-3 hover:bg-slate-50 font-bold text-sm">+</button>
+          </div>
+
+          <button 
+            onclick={() => layoutProps.cartCount()}
+            class="flex-1 bg-slate-900 hover:bg-slate-800 text-white text-xs font-black h-11 rounded-xl transition-all flex items-center justify-center gap-2"
+          >
+            <span>Add to Cart Allocation</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+{:else}
+  <div class="p-12 text-center">
+    <p class="text-sm font-bold text-slate-500">Target listing footprint could not be identified.</p>
+    <a href="/" class="text-xs text-red-600 font-bold underline mt-2 block">Return to Dashboard</a>
+  </div>
+{/if}
+</file>
+
+<file path="routes/+layout.svelte">
+<script>
+import './layout.css';
+	import favicon from '$lib/assets/favicon.svg';
+  import SidebarNav from '$lib/components/SidebarNav.svelte';
+  
+  let { children } = $props();
+
+  // Root states using Svelte 5 Runes
+  let searchQuery = $state("");
+  let selectedCategory = $state("All");
+  let fulfillmentMode = $state("pickup");
+  let cartCount = $state(0);
+  let favoritesCount = $state(0);
+  let activeBranch = $state("Kampala GPO");
+  let isLocationModalOpen = $state(false);
+
+  const branches = [
+    "Kampala GPO", "Entebbe Post Office", "Jinja Post Office",
+    "Mbarara Post Office", "Gulu Post Office", "Mbale Post Office"
+  ];
+
+  // Helper context providers to pass triggers downward when necessary
+  function updateCategory(cat) {
+    selectedCategory = cat;
+  }
+  
+  function updateFulfillment(mode) {
+    fulfillmentMode = mode;
+  }
+</script>
+<div class="flex-shrink-0  bg-slate-900 text-slate-300 text-[11px] font-semibold px-6 py-2.5 flex justify-between items-center border-b border-slate-800">
+      <div class="flex items-center gap-2">
+        <span class="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse"></span>
+        <span>Subsidized shipping across all 100+ national post collection offices</span>
+      </div>
+      <div>
+        <button 
+          onclick={() => isLocationModalOpen = true} 
+          class="hover:text-white transition-colors flex items-center gap-1 focus:outline-none"
+        >
+          <svg class="w-3.5 h-3.5 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.9a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd"/>
+          </svg>
+          <span>Branch Location: <strong class="underline text-white font-bold">{activeBranch}</strong></span>
+        </button>
+      </div>
+    </div>
+<!-- BACKDROP LOCKDOWN CONTAINER -->
+<div class="h-scr w-screen bg-slate-200 overflow-hidden flex items-center justify-center  font-sans text-slate-800">
+  <!-- INNER COMPACT FRAME -->
+  <div class="w-full h-full p-0   lg:h-[95vh] bg-white   shadow-xl border border-slate-300/80 overflow-hidden flex flex-col">
+    <!-- FIXED TOP UTILITY BAR -->
+    <!-- FIXED GLOBAL HEADER -->
+    <header class="flex-shrink-0 bg-white border-b border-slate-200 px-6 flex items-center justify-between gap-4 py-3">
+      <div class="flex items-center gap-4 flex-shrink-0">
+        <a href="/" class="flex items-center gap-2 focus:outline-none text-left">
+          <div class="font-black text-lg tracking-tight text-slate-950 flex items-center gap-1">
+            <span>POSTCOM</span>
+            <span class="bg-red-600 text-white text-[9px] px-1.5 py-0.5 rounded font-black tracking-widest">UG</span>
+          </div>
+        </a>
+      </div>
+
+      <!-- Single Global Search Input -->
+      <div class="flex-1 max-w-lg">
+        <div class="relative">
+          <input 
+            type="search" 
+            placeholder="Search premium local farm products, organic oils..."
+            bind:value={searchQuery}
+            class="w-full pl-10 pr-4 py-2 bg-slate-100 focus:bg-slate-50 border border-slate-200 focus:border-slate-300 rounded-xl text-xs transition-all focus:outline-none"
+          />
+          <svg class="w-4 h-4 text-slate-400 absolute left-3.5 top-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+          </svg>
+        </div>
+      </div>
+
+      <!-- Action Actions -->
+      <div class="flex items-center gap-4 flex-shrink-0">
+        <button class="relative p-2 hover:bg-slate-100 rounded-xl transition-colors focus:outline-none">
+          <svg class="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>
+          </svg>
+          {#if favoritesCount > 0}
+            <span class="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-red-600"></span>
+          {/if}
+        </button>
+
+        <button onclick={() => alert('Proceeding to Checkout')} class="bg-red-600 hover:bg-red-700 text-white font-bold text-xs px-4 py-2 rounded-xl flex items-center gap-2 shadow-sm">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/>
+          </svg>
+          <span class="hidden sm:inline">Cart:</span> <span>{cartCount} items</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- MAIN WORKSPACE ROW -->
+    <div class="flex-1 flex overflow-hidden relative">
+      <!-- Shared Nav Sidebar Component -->
+      <SidebarNav 
+        {selectedCategory} 
+        {fulfillmentMode} 
+        onCategoryChange={updateCategory}
+        onFulfillmentChange={updateFulfillment}
+      />
+
+      <!-- Dynamic Content Injection Point -->
+      <main class="flex-1 overflow-y-auto h-full p-6">
+        <!-- Render downstream subpages snippet passing necessary cross-boundary state parameters -->
+        {@render children({ searchQuery, selectedCategory, cartCount: () => cartCount++, favoritesCount: () => favoritesCount++ })}
+      </main>
+    </div>
+  </div>
+</div>
+</file>
+
+<file path="routes/+page.svelte">
+<!-- src/routes/+page.svelte -->
+<script>
+  import { goto } from '$app/navigation';
+  import ProductGrid from '$lib/components/ProductGrid.svelte';
+  import { products } from '$lib/data/products.js';
+
+  // Destructure states projected down by layout rendering snippets
+  let { data, ...layoutProps } = $props();
+
+  let favoritedProducts = $state({});
+
+  // Dynamic state composition with safe fallbacks (?? "") to prevent SSR undefined crashes
+  let filteredProducts = $derived(
+    products.filter(p => {
+      const currentCategory = layoutProps.selectedCategory ?? "All";
+      const currentSearch = layoutProps.searchQuery ?? "";
+
+      const matchesCategory = currentCategory === "All" || p.category === currentCategory;
+      const matchesSearch = p.name.toLowerCase().includes(currentSearch.toLowerCase()) || 
+                            p.seller.toLowerCase().includes(currentSearch.toLowerCase());
+                            
+      return matchesCategory && matchesSearch;
+    })
+  );
+
+  function handleProductRedirect(product) {
+    goto(`/${product.id}`);
+  }
+
+  function handleFavoriteToggle(id) {
+    if (favoritedProducts[id]) {
+      delete favoritedProducts[id];
+      layoutProps.favoritesCount?.( -1 ); 
+    } else {
+      favoritedProducts[id] = true;
+      layoutProps.favoritesCount?.( 1 );
+    }
+  }
+</script>
+<ProductGrid 
+  products={filteredProducts}
+  favoritedMap={favoritedProducts}
+  title={(layoutProps.selectedCategory ?? "All") === "All" ? "Current Catalog Offerings" : layoutProps.selectedCategory}
+  onProductSelect={handleProductRedirect}
+  onToggleFavorite={handleFavoriteToggle}
+  onAddToCart={() => layoutProps.cartCount?.()}
+/>
+</file>
+
+<file path="routes/layout.css">
+@import 'tailwindcss';
+@plugin '@tailwindcss/forms';
+@plugin '@tailwindcss/typography';
+</file>
+
+<file path="app.html">
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="text-scale" content="scale" />
+		%sveltekit.head%
+	</head>
+	<body data-sveltekit-preload-data="hover">
+		<div style="display: contents">%sveltekit.body%</div>
+	</body>
+</html>
+</file>
+
+</files>
