@@ -28,7 +28,7 @@
         <p class="text-sm font-bold text-slate-500">No matching items located in this sector.</p>
       </div>
     {:else}
-      <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6 max-w-7xl">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 max-w-7xl">
         {#each products as product (product.id)}
           <ProductCard 
             {product}
