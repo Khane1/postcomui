@@ -103,22 +103,7 @@
   <div class="space-y-5">
     
     <!-- Fulfillment Toggle -->
-    <div class="bg-slate-200/80 p-1 rounded-xl flex">
-      <button 
-        onclick={() => onFulfillmentChange?.('delivery')}
-        class="flex-1 py-1.5 text-xs font-bold rounded-lg transition-all text-center
-          {fulfillmentMode === 'delivery' ? 'bg-white text-slate-950 shadow-sm' : 'text-slate-500 hover:text-slate-800'}"
-      >
-        Delivery
-      </button>
-      <button 
-        onclick={() => onFulfillmentChange?.('pickup')}
-        class="flex-1 py-1.5 text-xs font-bold rounded-lg transition-all text-center
-          {fulfillmentMode === 'pickup' ? 'bg-white text-slate-950 shadow-sm' : 'text-slate-500 hover:text-slate-800'}"
-      >
-        Post Pickup
-      </button>
-    </div>
+    
 
     <!-- Navigation Anchor Links -->
     <nav class="space-y-1.5 relative" aria-label="Sidebar main navigation">
