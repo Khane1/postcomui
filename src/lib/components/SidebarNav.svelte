@@ -1,14 +1,21 @@
 <!-- lib/components/SidebarNav.svelte -->
 <script>
+  import { browser } from '$app/environment';
+
   let { 
     selectedCategory = "All", 
     fulfillmentMode = "pickup",
     onCategoryChange,
-    onFulfillmentChange
+    onFulfillmentChange,
+    onClaimCoupon // Prop added to forward coupon claim actions
   } = $props();
 
   // Reactive state rune tracking active hovered category list
   let hoveredCategory = $state(null);
+
+  // Compact ad state
+  let currentMiniSlide = $state(0);
+  let momoActivated = $state(false);
 
   const categories = [
     { id: "All", label: "Explore All", icon: "M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" },
@@ -17,7 +24,6 @@
     { id: "Arts & Crafts", label: "Arts & Crafts", icon: "M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" }
   ];
 
-  // Map containing subcategories + rich focus content cards to increase surface area
   const subcategoriesMap = {
     "All": {
       items: ["Harvest Campaigns", "Newly Listed Products", "Best Selling Items", "Subsidized Courier Deals"],
@@ -36,14 +42,65 @@
       promo: { title: "UNESCO Heritage", desc: "Certified authentic artisan crafts backing rural cooperatives." }
     }
   };
+
+  // Mini-sized promotional ads tailored for the sidebar width (w-64)
+  const miniSlides = [
+    {
+      bg: 'bg-emerald-800',
+      eyebrow: 'Agro Specials',
+      headline: 'Farm Fresh Deals',
+      sub: 'Save up to 40% on fresh produce direct from Luweero & Kasese.',
+      cta: 'Claim Coupon',
+      badge: '-40%',
+      coupon: 'HARVEST40'
+    },
+    {
+      bg: 'bg-purple-800',
+      eyebrow: 'Made in Uganda',
+      headline: 'Artisan Crafts',
+      sub: 'Authentic handmade goods supporting rural cooperatives.',
+      cta: 'Claim Coupon',
+      badge: '-25%',
+      coupon: 'CRAFT25'
+    },
+    {
+      bg: 'bg-amber-800',
+      eyebrow: 'Food & Drinks',
+      headline: 'Local Favorites',
+      sub: 'Premium honey, coffees, and teas delivered straight to your door.',
+      cta: 'Claim Coupon',
+      badge: '-20%',
+      coupon: 'FOOD20'
+    }
+  ];
+
+  function handleMiniCTA(coupon) {
+    onClaimCoupon?.(coupon);
+  }
+
+  function handleSidebarMoMo() {
+    if (momoActivated) return;
+    momoActivated = true;
+    onClaimCoupon?.('MOMOSAVE');
+    setTimeout(() => { momoActivated = false; }, 2500);
+  }
+
+  // Handle slide rotation logic
+  $effect(() => {
+    if (!browser) return;
+    const interval = setInterval(() => {
+      currentMiniSlide = (currentMiniSlide + 1) % miniSlides.length;
+    }, 5000);
+    return () => clearInterval(interval);
+  });
 </script>
 
 <!-- Aside wrapper container handles mouseleave to collapse active flyouts -->
 <aside 
   onmouseleave={() => hoveredCategory = null}
-  class="hidden lg:flex w-64 bg-slate-50/50 border-r border-slate-200 flex-col justify-between p-5 flex-shrink-0 relative z-30"
+  class="hidden lg:flex w-64 bg-slate-50/50 border-r border-slate-200 flex-col justify-between p-5 flex-shrink-0 relative z-30 min-h-screen"
 >
-  <div class="space-y-6">
+  <div class="space-y-5">
     
     <!-- Fulfillment Toggle -->
     <div class="bg-slate-200/80 p-1 rounded-xl flex">
@@ -63,7 +120,7 @@
       </button>
     </div>
 
-    <!-- Navigation Anchor Links (Relative context anchor) -->
+    <!-- Navigation Anchor Links -->
     <nav class="space-y-1.5 relative" aria-label="Sidebar main navigation">
       {#each categories as cat}
         {@const isSelected = selectedCategory === cat.id}
@@ -143,9 +200,77 @@
         </div>
       {/if}
     </nav>
+
+    <!-- COMPACT SIDEBAR INTERACTIVE ADS -->
+    <div class="space-y-3 pt-2">
+      <!-- Dynamic Rotating Promo Ad -->
+      <div 
+        class="relative overflow-hidden rounded-xl text-white p-4 {miniSlides[currentMiniSlide].bg} transition-all duration-500 shadow-sm flex flex-col justify-between min-h-[145px] group cursor-pointer"
+        onclick={() => handleMiniCTA(miniSlides[currentMiniSlide].coupon)}
+      >
+        <!-- Background blob decoration -->
+        <div class="absolute -right-4 -top-4 w-14 h-14 rounded-full bg-white/10 pointer-events-none group-hover:scale-110 transition-transform"></div>
+        
+        <div>
+          <div class="flex justify-between items-start gap-1">
+            <span class="text-[8px] font-extrabold uppercase tracking-wider bg-black/20 px-1.5 py-0.5 rounded">
+              {miniSlides[currentMiniSlide].eyebrow}
+            </span>
+            <span class="text-[9px] font-black text-amber-300 bg-black/30 px-1.5 py-0.5 rounded">
+              {miniSlides[currentMiniSlide].badge}
+            </span>
+          </div>
+          
+          <h5 class="text-xs font-black mt-2 leading-snug">
+            {miniSlides[currentMiniSlide].headline}
+          </h5>
+          <p class="text-[9px] text-white/80 mt-1 leading-normal font-medium">
+            {miniSlides[currentMiniSlide].sub}
+          </p>
+        </div>
+
+        <button 
+          onclick={(e) => { e.stopPropagation(); handleMiniCTA(miniSlides[currentMiniSlide].coupon); }}
+          class="w-full mt-3 bg-white hover:bg-slate-50 text-slate-950 text-[10px] font-extrabold py-1 rounded-lg transition-all active:scale-98 shadow-xs"
+        >
+          {miniSlides[currentMiniSlide].cta}
+        </button>
+      </div>
+
+      <!-- Compact MTN MoMo Promo -->
+      <div class="bg-amber-400 p-4 rounded-xl flex flex-col justify-between relative overflow-hidden min-h-[115px] shadow-sm">
+        <div class="absolute -right-6 -bottom-6 w-16 h-16 rounded-full bg-black/5 pointer-events-none"></div>
+        <div>
+          <span class="text-[8px] font-extrabold text-amber-950 uppercase tracking-widest bg-amber-500/30 px-1.5 py-0.5 rounded">
+            MTN MoMo
+          </span>
+          <h5 class="text-xs font-black text-amber-950 mt-1.5 leading-tight">
+            Get UGX 1,500 Cash-Back
+          </h5>
+          <p class="text-[9px] text-amber-900 mt-1 leading-normal font-medium">
+            On every order completed with MTN Mobile Money.
+          </p>
+        </div>
+        <button 
+          onclick={handleSidebarMoMo}
+          class="w-full mt-3 text-[10px] font-extrabold py-1 rounded-lg transition-all active:scale-98 shadow-xs
+            {momoActivated ? 'bg-emerald-700 text-white' : 'bg-slate-950 hover:bg-slate-900 text-amber-400'}"
+        >
+          {momoActivated ? '✓ Coupon Active!' : 'Activate — MOMOSAVE'}
+        </button>
+      </div>
+    </div>
+
   </div>
 
-  <div class="bg-slate-200/50 p-4 rounded-2xl border border-slate-200 flex-shrink-0">
+  <!-- Vendor Access Section -->
+  <div class="bg-slate-200/50 p-4 rounded-2xl border border-slate-200 flex-shrink-0 mt-5">
+    <p class="text-[10px] font-black tracking-wider text-slate-400 uppercase">Vendor Access</p>
+    <p class="text-xs text-slate-600 font-bold mt-1">Sell on Postcom to reach national buyers.</p>
+    <a href="#register" class="text-xs text-red-600 font-black hover:underline mt-2 inline-block">Enroll Shop →</a>
+  </div>
+
+   <div class="bg-slate-200/50 p-4 rounded-2xl border border-slate-200 flex-shrink-0">
     <p class="text-[10px] font-black tracking-wider text-slate-400 uppercase">Vendor Access</p>
     <p class="text-xs text-slate-600 font-bold mt-1">Sell on Postcom to reach national buyers.</p>
     <a href="#register" class="text-xs text-red-600 font-black hover:underline mt-2 inline-block">Enroll Shop →</a>
