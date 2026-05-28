@@ -194,28 +194,51 @@
   <!-- HERO CAROUSEL -->
   <div
     class="hero"
-    style="background:{slides[currentSlide].bg}"
+    style="--slide-bg:{slides[currentSlide].bg}"
     role="button"
     tabindex="0"
     onclick={handleSlideClick}
     onkeydown={(e) => e.key === 'Enter' && handleSlideClick()}
     aria-label="Browse deals carousel"
   >
-    <!-- Decorative circle bg -->
-    <div class="hero-circle"></div>
+    <!-- Geometric accent shapes -->
+    <div class="geo geo-1"></div>
+    <div class="geo geo-2"></div>
+    <div class="geo geo-3"></div>
+
+    <!-- Slide number indicator -->
+    <div class="slide-counter">
+      <span class="slide-current">{String(currentSlide + 1).padStart(2,'0')}</span>
+      <span class="slide-sep"></span>
+      <span class="slide-total">{String(slides.length).padStart(2,'0')}</span>
+    </div>
 
     {#each slides as slide, i}
       <div class="slide" class:active={i === currentSlide} aria-hidden={i !== currentSlide}>
 
         <div class="slide-content">
-          <span class="eyebrow">{slide.eyebrow}</span>
+          <div class="eyebrow-row">
+            <span class="eyebrow-pill">{slide.eyebrow}</span>
+          </div>
+
           <div class="headline">
             {#each slide.headline as line}<div>{line}</div>{/each}
           </div>
+
           <p class="slide-sub">{slide.sub}</p>
-          <button class="slide-cta" onclick={(e) => handleCTA(e, slide.coupon)}>
-            {slide.cta} ›
-          </button>
+
+          <div class="slide-actions">
+            <button class="slide-cta" onclick={(e) => handleCTA(e, slide.coupon)}>
+              {slide.cta}
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                <path d="M2.5 7h9M7.5 3l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+            <div class="coupon-chip">
+              <span class="coupon-label">CODE</span>
+              <span class="coupon-code">{slide.coupon}</span>
+            </div>
+          </div>
         </div>
 
         <div class="slide-imgs">
@@ -229,19 +252,27 @@
           {/each}
         </div>
 
-        <div class="disc-badge" style="background:{slide.badgeBg}">{slide.badge}</div>
+        <div class="disc-badge" style="--badge-bg:{slide.badgeBg}">
+          <span class="badge-num">{slide.badge}</span>
+          <span class="badge-off">OFF</span>
+        </div>
+
         <span class="tctext">T&Cs Apply</span>
       </div>
     {/each}
 
-    <div class="slide-dots">
+    <!-- Progress-bar style nav -->
+    <div class="slide-nav">
       {#each slides as _, i}
         <button
-          class="dot"
+          class="nav-bar"
           class:active={i === currentSlide}
+          class:past={i < currentSlide}
           onclick={(e) => { e.stopPropagation(); goSlide(i); }}
           aria-label="Go to slide {i + 1}"
-        ></button>
+        >
+          <span class="nav-fill"></span>
+        </button>
       {/each}
     </div>
   </div>
@@ -249,32 +280,61 @@
   <!-- RIGHT COLUMN -->
   <div class="right-col">
 
+    <!-- MoMo card -->
     <div class="momo-card">
-      <div>
-        <div class="momo-label">MTN MoMo · Exclusive</div>
+      <div class="momo-header">
+        <div class="momo-brand">
+          <span class="momo-dot"></span>
+          <span class="momo-label">MTN MoMo · Exclusive</span>
+        </div>
+        <div class="cashback-tag">+1,500 UGX</div>
+      </div>
+
+      <div class="momo-body">
         <div class="momo-headline">Pay MoMo,<br />Get Cash-Back</div>
-        <div class="cashback-tag">+1,500 UGX back</div>
         <p class="momo-sub">Instant credit on every order paid with your MTN Mobile Money wallet.</p>
       </div>
+
       <button class="momo-btn" class:activated={momoActivated} onclick={handleMoMo}>
-        {momoActivated ? '✓ MOMOSAVE Activated!' : 'Activate — MOMOSAVE'}
+        {#if momoActivated}
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+            <path d="M2 7l3.5 3.5L12 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          MOMOSAVE Activated!
+        {:else}
+          Activate — MOMOSAVE
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+            <path d="M2.5 7h9M7.5 3l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        {/if}
       </button>
     </div>
 
+    <!-- Flash sale -->
     <div class="flash-strip">
-      <div class="flash-left">
-        <div class="flash-icon">⚡</div>
-        <div>
-          <div class="flash-label">Flash Sale</div>
-          <div class="flash-sub">Limited batches left</div>
+      <div class="flash-header">
+        <div class="flash-eyebrow">
+          <span class="flash-pulse"></span>
+          Flash Sale
         </div>
+        <span class="flash-sub">Limited stock left</span>
       </div>
+
       <div class="flash-timer">
-        <div class="t-box"><span>{pad(hours)}</span><small>hrs</small></div>
-        <div class="t-colon">:</div>
-        <div class="t-box"><span>{pad(minutes)}</span><small>min</small></div>
-        <div class="t-colon">:</div>
-        <div class="t-box"><span>{pad(seconds)}</span><small>sec</small></div>
+        <div class="t-unit">
+          <span class="t-num">{pad(hours)}</span>
+          <span class="t-label">hrs</span>
+        </div>
+        <span class="t-sep">:</span>
+        <div class="t-unit">
+          <span class="t-num">{pad(minutes)}</span>
+          <span class="t-label">min</span>
+        </div>
+        <span class="t-sep">:</span>
+        <div class="t-unit">
+          <span class="t-num">{pad(seconds)}</span>
+          <span class="t-label">sec</span>
+        </div>
       </div>
     </div>
 
@@ -282,433 +342,577 @@
 
   <!-- LIVE ACTIVITY BAR -->
   <div class="activity-bar">
-    <div class="live-dot"></div>
-    <div class="activity-label">Live</div>
+    <div class="live-badge">
+      <span class="live-dot"></span>
+      Live
+    </div>
     <div class="activity-ticker">
       <div class="ticker-text">{tickerText}</div>
     </div>
-    <div class="buyers-live">{buyersCount.toLocaleString()} shopping</div>
+    <div class="buyers-live">
+      <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+        <circle cx="5" cy="5" r="4" fill="#4ade80" opacity="0.25"/>
+        <circle cx="5" cy="5" r="2.5" fill="#4ade80"/>
+      </svg>
+      {buyersCount.toLocaleString()} shopping
+    </div>
   </div>
 
 </div>
 
 <style>
-  *, *::before, *::after { box-sizing: border-box; }
+  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
   .banners-wrap {
     display: grid;
     grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
-    gap: 12px;
-    padding: 4px 0;
-    font-family: Arial, Helvetica, sans-serif;
+    gap: 10px;
+    font-family: 'DM Sans', system-ui, sans-serif;
   }
 
   @media (max-width: 640px) {
     .banners-wrap { grid-template-columns: 1fr; }
   }
 
-  /* HERO */
+  /* ── HERO ── */
   .hero {
     position: relative;
     overflow: hidden;
-    min-height: 290px;
-    border-radius: 20px;
+    min-height: 300px;
+    border-radius: 24px;
     cursor: pointer;
-    transition: background 0.6s ease;
+    background: var(--slide-bg, #2d6a2d);
+    transition: background 0.7s cubic-bezier(0.4,0,0.2,1);
     user-select: none;
-    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.13);
   }
 
-  .hero-circle {
+  /* Geometric shapes */
+  .geo {
     position: absolute;
-    width: 320px;
-    height: 320px;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.07);
-    right: -60px;
-    top: -80px;
+    border-radius: 4px;
     pointer-events: none;
   }
+  .geo-1 {
+    width: 200px; height: 200px;
+    border: 1.5px solid rgba(255,255,255,0.1);
+    border-radius: 50%;
+    right: -50px; top: -60px;
+  }
+  .geo-2 {
+    width: 120px; height: 120px;
+    border: 1.5px solid rgba(255,255,255,0.07);
+    border-radius: 50%;
+    right: 30px; top: 20px;
+  }
+  .geo-3 {
+    width: 60px; height: 60px;
+    background: rgba(255,255,255,0.05);
+    border-radius: 12px;
+    transform: rotate(22deg);
+    right: 140px; top: -20px;
+  }
 
+  /* Slide counter */
+  .slide-counter {
+    position: absolute;
+    top: 18px; left: 20px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    z-index: 20;
+  }
+  .slide-current {
+    font-family: 'Syne', sans-serif;
+    font-size: 11px;
+    font-weight: 800;
+    color: rgba(255,255,255,0.95);
+    letter-spacing: 0.04em;
+  }
+  .slide-sep {
+    display: block;
+    width: 18px;
+    height: 1px;
+    background: rgba(255,255,255,0.35);
+  }
+  .slide-total {
+    font-size: 11px;
+    font-weight: 500;
+    color: rgba(255,255,255,0.4);
+    letter-spacing: 0.04em;
+  }
+
+  /* Slides */
   .slide {
     position: absolute;
     inset: 0;
     display: flex;
     opacity: 0;
-    transition: opacity 0.55s ease;
+    transform: translateX(12px);
+    transition: opacity 0.5s ease, transform 0.5s ease;
     pointer-events: none;
   }
-
   .slide.active {
     opacity: 1;
+    transform: translateX(0);
     pointer-events: auto;
   }
 
+  /* Content */
   .slide-content {
     position: absolute;
     left: 0; top: 0; bottom: 0;
-    width: 54%;
-    padding: 24px 20px;
+    width: 56%;
+    padding: 52px 22px 28px;
     display: flex;
     flex-direction: column;
     justify-content: center;
     z-index: 2;
   }
 
-  .eyebrow {
-    background: rgba(0, 0, 0, 0.2);
-    color: #fff;
+  .eyebrow-row { margin-bottom: 12px; }
+
+  .eyebrow-pill {
     font-size: 9px;
-    font-weight: 700;
-    letter-spacing: .1em;
+    font-weight: 600;
+    letter-spacing: 0.12em;
     text-transform: uppercase;
-    padding: 3px 10px;
-    border-radius: 20px;
+    color: rgba(255,255,255,0.7);
+    border: 1px solid rgba(255,255,255,0.2);
+    padding: 4px 10px;
+    border-radius: 100px;
     display: inline-block;
-    margin-bottom: 10px;
-    width: fit-content;
+    backdrop-filter: blur(4px);
+    background: rgba(255,255,255,0.08);
   }
 
   .headline {
-    font-size: clamp(24px, 3.5vw, 34px);
-    font-weight: 900;
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(28px, 3.8vw, 40px);
+    font-weight: 800;
     color: #fff;
-    line-height: 1;
-    margin-bottom: 10px;
+    line-height: 0.95;
+    margin-bottom: 12px;
     text-transform: uppercase;
-    letter-spacing: -.5px;
-    text-shadow: 0 2px 8px rgba(0,0,0,0.18);
+    letter-spacing: -0.02em;
   }
 
   .slide-sub {
     font-size: 11px;
-    color: rgba(255, 255, 255, 0.88);
-    margin-bottom: 18px;
-    line-height: 1.5;
-    font-weight: 600;
+    color: rgba(255,255,255,0.72);
+    margin-bottom: 20px;
+    line-height: 1.6;
+    font-weight: 400;
+    max-width: 220px;
+  }
+
+  .slide-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
   }
 
   .slide-cta {
     background: #fff;
-    color: #222;
+    color: #111;
+    font-family: 'DM Sans', sans-serif;
     font-size: 11px;
-    font-weight: 800;
+    font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: .06em;
-    padding: 9px 20px;
-    border-radius: 50px;
+    letter-spacing: 0.08em;
+    padding: 9px 16px;
+    border-radius: 100px;
     border: none;
     cursor: pointer;
-    width: fit-content;
-    transition: background .1s, transform .1s;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: transform 0.15s ease, background 0.15s ease;
+  }
+  .slide-cta:hover { background: #f2f2f2; transform: translateY(-1px); }
+  .slide-cta:active { transform: scale(0.97); }
+
+  .coupon-chip {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    background: rgba(255,255,255,0.12);
+    border: 1px dashed rgba(255,255,255,0.3);
+    border-radius: 6px;
+    padding: 5px 10px;
+  }
+  .coupon-label {
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    color: rgba(255,255,255,0.5);
+    text-transform: uppercase;
+  }
+  .coupon-code {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    color: rgba(255,255,255,0.9);
+    font-family: monospace;
   }
 
-  .slide-cta:hover { background: #f0f0f0; }
-  .slide-cta:active { transform: scale(.97); }
-
-  /* Product images area */
+  /* Images */
   .slide-imgs {
     position: absolute;
     right: 0; top: 0; bottom: 0;
-    width: 50%;
+    width: 48%;
     display: flex;
     align-items: flex-end;
     justify-content: center;
     gap: 6px;
-    padding: 12px 14px 0 0;
+    padding: 14px 12px 0 0;
     overflow: hidden;
   }
-
   .slide-imgs img {
     flex-shrink: 0;
-    animation: float 3.5s ease-in-out infinite;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.22);
+    animation: float 3.8s ease-in-out infinite;
+    box-shadow: 0 12px 32px rgba(0,0,0,0.28);
   }
-
-  .slide-imgs img:nth-child(2) { animation-delay: .3s; }
-  .slide-imgs img:nth-child(3) { animation-delay: .6s; }
+  .slide-imgs img:nth-child(2) { animation-delay: 0.35s; }
+  .slide-imgs img:nth-child(3) { animation-delay: 0.7s; }
 
   @keyframes float {
-    0%, 100% { transform-origin: bottom center; }
-    50% { margin-bottom: 8px; }
+    0%, 100% { margin-bottom: 0; }
+    50% { margin-bottom: 7px; }
   }
 
+  /* Discount badge */
   .disc-badge {
     position: absolute;
-    top: 14px; right: 14px;
+    top: 16px; right: 16px;
+    background: var(--badge-bg, #e60000);
     color: #fff;
-    font-size: 13px;
-    font-weight: 900;
-    width: 50px; height: 50px;
+    width: 52px; height: 52px;
     border-radius: 50%;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    border: 2.5px solid rgba(255, 255, 255, 0.35);
     z-index: 10;
+    gap: 0;
+  }
+  .badge-num {
+    font-family: 'Syne', sans-serif;
+    font-size: 13px;
+    font-weight: 800;
     line-height: 1;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.25);
+    letter-spacing: -0.02em;
+  }
+  .badge-off {
+    font-size: 7px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    opacity: 0.8;
+    text-transform: uppercase;
+    line-height: 1.2;
   }
 
   .tctext {
     position: absolute;
-    bottom: 10px; left: 16px;
-    font-size: 9px;
-    color: rgba(255, 255, 255, 0.4);
-    font-weight: 600;
+    bottom: 8px; left: 16px;
+    font-size: 8px;
+    color: rgba(255,255,255,0.28);
+    font-weight: 500;
+    letter-spacing: 0.04em;
     z-index: 10;
   }
 
-  .slide-dots {
+  /* Progress nav bars */
+  .slide-nav {
     position: absolute;
-    bottom: 12px;
+    bottom: 14px;
     left: 50%;
     transform: translateX(-50%);
     display: flex;
-    gap: 5px;
+    gap: 4px;
     z-index: 20;
   }
-
-  .dot {
-    width: 7px; height: 7px;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.4);
+  .nav-bar {
+    width: 28px;
+    height: 3px;
+    background: rgba(255,255,255,0.2);
     border: none;
     cursor: pointer;
     padding: 0;
-    transition: all .25s;
+    border-radius: 2px;
+    overflow: hidden;
+    transition: width 0.3s ease;
+    position: relative;
   }
-
-  .dot.active {
+  .nav-bar.active {
+    width: 52px;
+  }
+  .nav-bar.past {
+    background: rgba(255,255,255,0.5);
+  }
+  .nav-fill {
+    position: absolute;
+    inset: 0;
     background: #fff;
-    width: 22px;
-    border-radius: 4px;
+    transform: scaleX(0);
+    transform-origin: left;
+    border-radius: 2px;
+  }
+  .nav-bar.active .nav-fill {
+    animation: fill-bar 4.5s linear forwards;
+  }
+  @keyframes fill-bar {
+    from { transform: scaleX(0); }
+    to { transform: scaleX(1); }
   }
 
-  /* RIGHT COL */
+  /* ── RIGHT COLUMN ── */
   .right-col {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 10px;
   }
 
-  /* MoMo */
+  /* MoMo Card */
   .momo-card {
     background: #ffcb05;
-    border-radius: 20px;
-    padding: 18px 16px;
-    position: relative;
-    overflow: hidden;
-    flex: 1;
+    border-radius: 24px;
+    padding: 18px 18px 16px;
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
-    min-height: 140px;
-    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.09);
+    gap: 12px;
+    flex: 1;
+    min-height: 150px;
+    position: relative;
+    overflow: hidden;
   }
-
-  .momo-card::before {
-    content: '';
-    position: absolute;
-    right: -28px; top: -28px;
-    width: 120px; height: 120px;
-    background: rgba(0, 0, 0, 0.06);
-    border-radius: 50%;
-    pointer-events: none;
-  }
-
   .momo-card::after {
     content: '';
     position: absolute;
-    right: 20px; bottom: -40px;
-    width: 90px; height: 90px;
-    background: rgba(0, 0, 0, 0.04);
+    right: -36px; bottom: -36px;
+    width: 130px; height: 130px;
+    border: 28px solid rgba(0,0,0,0.05);
     border-radius: 50%;
     pointer-events: none;
   }
 
+  .momo-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .momo-brand {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .momo-dot {
+    width: 6px; height: 6px;
+    background: #1a0e00;
+    border-radius: 50%;
+    opacity: 0.5;
+  }
   .momo-label {
     font-size: 9px;
-    font-weight: 800;
+    font-weight: 700;
+    letter-spacing: 0.1em;
     text-transform: uppercase;
-    letter-spacing: .1em;
-    color: #3d2e00;
-    background: rgba(0, 0, 0, 0.1);
-    padding: 3px 8px;
-    border-radius: 20px;
-    width: fit-content;
-    margin-bottom: 5px;
+    color: rgba(26,14,0,0.55);
   }
-
-  .momo-headline {
-    font-size: 17px;
-    font-weight: 900;
-    color: #1a0e00;
-    line-height: 1.15;
-    margin-bottom: 6px;
-  }
-
   .cashback-tag {
     background: #1a0e00;
     color: #ffcb05;
-    font-size: 13px;
-    font-weight: 900;
-    padding: 4px 12px;
-    border-radius: 20px;
-    display: inline-block;
-    margin-bottom: 7px;
-    width: fit-content;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 100px;
+    letter-spacing: 0.02em;
   }
 
+  .momo-body { flex: 1; }
+
+  .momo-headline {
+    font-family: 'Syne', sans-serif;
+    font-size: 18px;
+    font-weight: 800;
+    color: #1a0e00;
+    line-height: 1.1;
+    margin-bottom: 7px;
+    letter-spacing: -0.02em;
+  }
   .momo-sub {
     font-size: 10px;
-    color: #4a3800;
-    font-weight: 600;
-    line-height: 1.5;
-    margin-bottom: 12px;
+    color: rgba(26,14,0,0.55);
+    font-weight: 400;
+    line-height: 1.55;
   }
 
   .momo-btn {
     background: #1a0e00;
     color: #ffcb05;
+    font-family: 'DM Sans', sans-serif;
     font-size: 10px;
-    font-weight: 800;
+    font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: .06em;
-    padding: 9px 12px;
+    letter-spacing: 0.08em;
+    padding: 10px 14px;
     border: none;
-    border-radius: 50px;
+    border-radius: 100px;
     cursor: pointer;
     width: 100%;
-    transition: background .15s, color .15s;
-  }
-
-  .momo-btn:hover { background: #2e1e00; }
-  .momo-btn.activated { background: #14532d; color: #fff; }
-
-  /* Flash strip */
-  .flash-strip {
-    background: #c0392b;
-    border-radius: 20px;
-    padding: 12px 16px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
-  }
-
-  .flash-left { display: flex; align-items: center; gap: 10px; }
-
-  .flash-icon {
-    background: #fff;
-    color: #c0392b;
-    font-size: 14px;
-    font-weight: 900;
-    width: 30px; height: 30px;
-    border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
+    gap: 6px;
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+  .momo-btn:hover { background: #2e1e00; }
+  .momo-btn.activated {
+    background: #14532d;
+    color: #fff;
+  }
+
+  /* Flash Strip */
+  .flash-strip {
+    background: #111;
+    border-radius: 20px;
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  .flash-header {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .flash-eyebrow {
+    font-family: 'Syne', sans-serif;
+    font-size: 12px;
+    font-weight: 800;
+    color: #fff;
+    letter-spacing: 0.02em;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    text-transform: uppercase;
+  }
+  .flash-pulse {
+    display: inline-block;
+    width: 7px; height: 7px;
+    background: #f43f5e;
+    border-radius: 50%;
+    animation: flash-blink 1.2s ease-in-out infinite;
     flex-shrink: 0;
   }
-
-  .flash-label {
-    color: #fff;
-    font-size: 10px;
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: .06em;
-    line-height: 1.3;
+  @keyframes flash-blink {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.8); }
   }
 
-  .flash-sub { color: rgba(255, 255, 255, 0.65); font-size: 9px; font-weight: 600; }
+  .flash-sub {
+    font-size: 9px;
+    color: rgba(255,255,255,0.35);
+    font-weight: 500;
+    letter-spacing: 0.04em;
+  }
 
-  .flash-timer { display: flex; gap: 4px; align-items: center; }
-
-  .t-box {
-    background: rgba(0, 0, 0, 0.25);
+  .flash-timer {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+  }
+  .t-unit {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.08);
     border-radius: 8px;
-    padding: 4px 7px;
-    text-align: center;
-    min-width: 34px;
+    padding: 5px 8px;
+    min-width: 36px;
   }
-
-  .t-box span {
-    display: block;
+  .t-num {
+    font-family: 'Syne', sans-serif;
+    font-size: 16px;
+    font-weight: 800;
     color: #fff;
-    font-size: 15px;
-    font-weight: 900;
     line-height: 1;
     font-variant-numeric: tabular-nums;
+    letter-spacing: 0.02em;
   }
-
-  .t-box small {
-    display: block;
-    color: rgba(255, 255, 255, 0.5);
+  .t-label {
     font-size: 7px;
+    color: rgba(255,255,255,0.3);
     text-transform: uppercase;
-    letter-spacing: .06em;
+    letter-spacing: 0.08em;
+    margin-top: 2px;
   }
-
-  .t-colon {
-    color: rgba(255, 255, 255, 0.5);
+  .t-sep {
+    color: rgba(255,255,255,0.2);
     font-size: 14px;
-    font-weight: 900;
-    padding-bottom: 9px;
+    font-weight: 700;
+    padding-bottom: 10px;
+    margin: 0 1px;
   }
 
-  /* Activity bar */
+  /* ── ACTIVITY BAR ── */
   .activity-bar {
     grid-column: 1 / -1;
-    background: #1e1e1e;
-    border-radius: 16px;
-    padding: 9px 16px;
+    background: #f5f4f0;
+    border: 1px solid rgba(0,0,0,0.06);
+    border-radius: 14px;
+    padding: 8px 14px;
     display: flex;
     align-items: center;
     gap: 10px;
     overflow: hidden;
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
   }
 
+  .live-badge {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    background: #fff;
+    border: 1px solid rgba(0,0,0,0.08);
+    border-radius: 100px;
+    padding: 3px 8px 3px 6px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #111;
+    flex-shrink: 0;
+  }
   .live-dot {
-    width: 8px; height: 8px;
+    width: 6px; height: 6px;
     background: #4ade80;
     border-radius: 50%;
-    flex-shrink: 0;
-    animation: blink 1.4s infinite;
+    animation: blink 1.4s ease-in-out infinite;
   }
-
   @keyframes blink {
     0%, 100% { opacity: 1; }
-    50% { opacity: .2; }
-  }
-
-  .activity-label {
-    color: #555;
-    font-size: 10px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: .08em;
-    flex-shrink: 0;
+    50% { opacity: 0.25; }
   }
 
   .activity-ticker {
     flex: 1;
     overflow: hidden;
-    height: 18px;
+    height: 16px;
     position: relative;
   }
-
   .ticker-text {
     position: absolute;
     white-space: nowrap;
     font-size: 11px;
-    color: #aaa;
-    font-weight: 500;
+    color: #666;
+    font-weight: 400;
     animation: scroll-left 36s linear infinite;
   }
-
   @keyframes scroll-left {
     0% { transform: translateX(100%); }
     100% { transform: translateX(-100%); }
@@ -716,9 +920,12 @@
 
   .buyers-live {
     flex-shrink: 0;
-    color: #4ade80;
+    display: flex;
+    align-items: center;
+    gap: 5px;
     font-size: 10px;
-    font-weight: 700;
+    font-weight: 600;
+    color: #2d6a2d;
     white-space: nowrap;
   }
 </style>

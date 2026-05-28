@@ -7,8 +7,7 @@ class AppState {
   favoritesCount = $state(0);
   activeBranch = $state("Kampala GPO");
   isLocationModalOpen = $state(false);
-  
-  // Real-time toast notifications list
+  isSidebarOpen = $state(false); // Mobile drawer toggle state
   toasts = $state([]);
 
   // Svelte 5 Getter to dynamically calculate derived cart items count
@@ -25,5 +24,7 @@ class AppState {
     }, 3000);
   }
 }
+
+
 
 export const appState = new AppState();

@@ -12,7 +12,7 @@
   } = $props();
 </script>
 
-<div class="space-y-6">
+<div class="space-y-6 pt-5">
   <section class="space-y-4">
     <div class="flex justify-between items-baseline border-b border-slate-200 pb-2">
       <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest">
@@ -29,7 +29,7 @@
       </div>
     {:else}
       <!-- Dense, responsive grid customized for compact cards -->
-      <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4 max-w-7xl">
+      <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols- gap-3 sm:gap-4 max-w-7xl">
         {#each products as product (product.id)}
           <ProductCard 
             {product}
