@@ -2,52 +2,52 @@
 <script>
   import { appState } from '$lib/state.svelte.js';
 
-  // 1:1 translation of the quick-scroller into verified Ugandan catalog items
+  // Quick-scroller staples mapped into Instacart filter pill layouts
   const subcategoryBubbles = [
     { 
-      label: "Coffee", 
+      label: "Sipi Coffee", 
       query: "Coffee", 
       category: "Agro Products",
       image: "https://images.unsplash.com/photo-1559056199-641a0ac8b55e?auto=format&fit=crop&q=80&w=150" 
     },
     { 
-      label: "Honey", 
+      label: "Forest Honey", 
       query: "Honey", 
       category: "Food & Beverages",
       image: "https://images.unsplash.com/photo-1587049352846-4a222e784d38?auto=format&fit=crop&q=80&w=150" 
     },
     { 
-      label: "Flours", 
+      label: "Millet Flour", 
       query: "Flour", 
       category: "Agro Products",
       image: "https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&q=80&w=150" 
     },
     { 
-      label: "Shea Butter", 
+      label: "Nile Shea", 
       query: "Shea", 
       category: "Health & Beauty",
       image: "https://images.unsplash.com/photo-1608248597279-f99d160bfcbc?auto=format&fit=crop&q=80&w=150" 
     },
     { 
-      label: "Baskets", 
+      label: "Sisal Baskets", 
       query: "Basket", 
       category: "Arts & Crafts",
       image: "https://images.unsplash.com/photo-1504198266287-1659872e6590?auto=format&fit=crop&q=80&w=150" 
     },
     { 
-      label: "Vanilla", 
+      label: "Bourbon Vanilla", 
       query: "Vanilla", 
       category: "Agro Products",
       image: "https://images.unsplash.com/photo-1595122245594-a55086ee50a6?auto=format&fit=crop&q=80&w=150" 
     },
     { 
-      label: "Dried Fish", 
+      label: "Dried Mukene", 
       query: "Mukene", 
       category: "Food & Beverages",
       image: "https://images.unsplash.com/photo-1534482421-64566f976cfa?auto=format&fit=crop&q=80&w=150" 
     },
     { 
-      label: "Horn Cups", 
+      label: "Ankole Horn Cups", 
       query: "Horn", 
       category: "Arts & Crafts",
       image: "https://images.unsplash.com/photo-1603006905003-be475563bc59?auto=format&fit=crop&q=80&w=150" 
@@ -55,9 +55,14 @@
   ];
 
   function handleBubbleClick(query, category) {
-    appState.searchQuery = query;
-    if (category) {
-      appState.selectedCategory = category;
+    // Toggle filter off if clicked again, otherwise apply it
+    if (appState.searchQuery === query) {
+      appState.searchQuery = "";
+    } else {
+      appState.searchQuery = query;
+      if (category) {
+        appState.selectedCategory = category;
+      }
     }
     
     // Smooth scroll down to the product feed anchor instantly
@@ -68,50 +73,55 @@
   }
 </script>
 
-<section class="space-y-4 select-none">
+<section class="space-y-3.5 select-none font-sans">
   <!-- Dynamic Title Header -->
-  <div class="flex justify-between items-baseline border-b border-slate-200 pb-2">
-    <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest">
-      {#if appState.selectedCategory === "All"}
-        Shop Popular Staples
-      {:else}
-        Popular in {appState.selectedCategory}
-      {/if}
-    </h3>
-    <span class="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Swipe to Browse</span>
-  </div>
-  
-  <!-- Swipeable Horizontal Row -->
-  <div class="flex gap-4 overflow-x-auto pb-3 scrollbar-none snap-x" style="-webkit-overflow-scrolling: touch;">
-    {#each subcategoryBubbles as bubble}
-      <!-- Render corresponding category or let it fall back safely -->
-      {#if appState.selectedCategory === "All" || bubble.category === appState.selectedCategory}
-        <button 
-          onclick={() => handleBubbleClick(bubble.query, bubble.category)}
-          class="snap-start flex-shrink-0 flex flex-col items-center group focus:outline-none"
-        >
-          <!-- Soft-blue rounded square container -->
-          <div class="w-20 h-20 sm:w-24 sm:h-24 bg-blue-50/70 hover:bg-red-50 border border-blue-100/40 rounded-2xl flex items-center justify-center p-3.5 transition-all duration-300 transform group-hover:scale-105 group-hover:border-red-200 group-hover:shadow-sm">
-            <img 
-              src={bubble.image} 
-              alt={bubble.label}
-              class="w-full h-full object-contain rounded-xl mix-blend-multiply transition-transform duration-300"
-            />
-          </div>
-          
-          <!-- Label centered directly below the box -->
-          <span class="text-[10px] sm:text-[11px] font-extrabold text-slate-500 text-center mt-2 group-hover:text-red-600 transition-colors uppercase tracking-wider select-none truncate max-w-[80px] sm:max-w-[96px]">
-            {bubble.label}
-          </span>
-        </button>
-      {/if}
-    {/each}
+  <!-- Constraining wrapper to prevent parent flexbox blowout on small screens -->
+  <div class="w-full overflow-hidden min-w-0">
+    <!-- Responsive Track: Swipeable on mobile, multi-row wrap on desktop -->
+    <div 
+      class="flex flex-nowrap gap-2 sm:gap-2.5 overflow-x-auto pb-3 w-full min-w-0 max-w-full sm:flex-wrap sm:overflow-visible sm:pb-0 scrollbar-none snap-x" 
+    style="-webkit-overflow-scrolling: touch;"
+    >
+      {#each subcategoryBubbles as bubble}
+        {#if appState.selectedCategory === "All" || bubble.category === appState.selectedCategory}
+          {@const isActive = appState.searchQuery === bubble.query}
+          <button 
+            onclick={() => handleBubbleClick(bubble.query, bubble.category)}
+            class="snap-start shrink-0 flex items-center gap-2 px-3.5 py-2 sm:py-1.5 rounded-full transition-all duration-150 border focus:outline-none cursor-pointer group
+              {isActive 
+                ? 'bg-[#003d29] text-white border-[#003d29] shadow-xs' 
+                : 'bg-white text-slate-700 border-slate-200 hover:border-[#003d29] hover:bg-slate-50'}"
+          >
+            <!-- Miniature Circular Crop Thumbnail -->
+            <div class="w-5 h-5 rounded-full overflow-hidden shrink-0 border bg-slate-50 {isActive ? 'border-white/20' : 'border-slate-100'}">
+              <img 
+                src={bubble.image} 
+                alt=""
+                class="w-full h-full object-cover transition-transform group-hover:scale-105"
+              />
+            </div>
+            
+            <!-- Pill Text Label -->
+            <span class="text-xs font-bold tracking-tight select-none {isActive ? 'text-white' : 'text-slate-700'}">
+              {bubble.label}
+            </span>
+          </button>
+        {/if}
+      {/each}
+    </div>
   </div>
 </section>
 
 <style>
-  /* Prevent image dragging on touch targets */
+  /* Disable swipe imagery dragging */
   img {
     -webkit-user-drag: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollbar-none {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
   }
 </style>

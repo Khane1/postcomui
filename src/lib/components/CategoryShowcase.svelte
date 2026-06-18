@@ -1,27 +1,38 @@
-<!-- lib/components/CategoryShowcase.svelte -->
 <script>
   import { appState } from '$lib/state.svelte.js';
 
-  // Categories mapped to realistic organic images representing local Ugandan goods
+  // Categories mapped to soft pastel backings matching Instacart's department layouts
   const categoryCards = [
     {
       id: "Agro Products",
-      title: "Agro Products",
+      title: "Agro & Produce",
+      sub: "Fresh from regional co-ops",
+      bg: "bg-[#EAF7F0]", // Soft pastel green
+      textColor: "text-[#003d29]", // Instacart deep green
       image: "https://images.unsplash.com/photo-1500937386664-56d1dfef3854?auto=format&fit=crop&q=80&w=400"
     },
     {
       id: "Food & Beverages",
-      title: "Food & Drinks",
+      title: "Beverages & Staples",
+      sub: "Local coffees, honey & grains",
+      bg: "bg-[#FFF6EE]", // Soft pastel peach/orange
+      textColor: "text-[#4a1500]",
       image: "https://images.unsplash.com/photo-1587049352846-4a222e784d38?auto=format&fit=crop&q=80&w=400"
     },
     {
       id: "Arts & Crafts",
       title: "Arts & Crafts",
+      sub: "UNESCO certified handmade",
+      bg: "bg-[#FAF5FF]", // Soft pastel lavender
+      textColor: "text-[#2e104a]",
       image: "https://images.unsplash.com/photo-1504198266287-1659872e6590?auto=format&fit=crop&q=80&w=400"
     },
     {
       id: "Health & Beauty",
       title: "Health & Beauty",
+      sub: "Raw Shea & organic wellness",
+      bg: "bg-[#FFF5F5]", // Soft pastel blush pink
+      textColor: "text-[#4a0000]",
       image: "https://images.unsplash.com/photo-1608248597279-f99d160bfcbc?auto=format&fit=crop&q=80&w=400"
     }
   ];
@@ -37,42 +48,43 @@
   }
 </script>
 
-<!-- Outer Container matching the reference image's card box -->
-<div class="bg-white rounded-3xl p-6 space-y-6 select-none">
+<div class="bg-white rounded-2xl select-none font-sans">
   
-  <!-- Jumia × Instacart Inspired Header -->
-  <div class="flex items-start gap-3">
-    <!-- Vector Lightbulb Icon -->
-     
-    <div class="space-y-0.5">
-      <h3 class="text-sm sm:text-base text-slate-500 font-bold text-slate-300 uppercase tracking-wider">Categories you might like</h3>
-      <p class="text-[10px] sm:text-xs text-slate-400 font-bold uppercase tracking-wider">Find the latest best deals by category</p>
+  <div class="mb-5 flex items-baseline justify-between">
+    <div>
+      <h3 class="text-lg font-black text-slate-900 tracking-tight">Shop by department</h3>
+      <p class="text-xs text-slate-500 font-medium mt-0.5">Explore curated, cooperative-verified categories</p>
     </div>
   </div>
   
-  <!-- Category Cards Grid (2 columns on mobile, 4 columns on desktop) -->
-  <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+  <div class="flex gap-3 overflow-x-auto pb-4 scrollbar-none snap-x -mx-4 px-4 sm:mx-0 sm:px-0 sm:pb-0 grid grid-cols-2 md:grid-cols-4 sm:gap-4">
     {#each categoryCards as card}
       <button 
         onclick={() => handleCategoryClick(card.id)}
-        class="relative aspect-[16/5] w-full rounded-2xl overflow-hidden border-2 border-transparent hover:border-red-600 transition-all duration-300 transform hover:-translate-y-1 hover:shadow-md focus:outline-none group cursor-pointer"
+        class="relative flex flex-col justify-between {card.bg} h-36 sm:h-40 w-[150px] sm:w-full shrink-0 snap-start rounded-2xl overflow-hidden p-4 group transition-all duration-300 transform hover:shadow-md hover:-translate-y-0.5 border border-slate-200/20 focus:outline-none cursor-pointer"
       >
-        <!-- Background Image -->
-        <img 
-          src={card.image} 
-          alt="" 
-          loading="lazy"
-          class="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-        />
-        
-        <!-- Dark Overlay for contrast -->
-        <div class="absolute inset-0 bg-slate-950/45 group-hover:bg-slate-950/35 transition-colors"></div>
-        
-        <!-- Centered Typography -->
-        <div class="absolute inset-0 flex items-center justify-center p-3 text-center">
-          <span class="text-white text-xs sm:text-sm font-black tracking-wide uppercase drop-shadow-sm select-none">
+        <div class="z-10 text-left max-w-[110px] sm:max-w-[140px]">
+          <span class="{card.textColor} text-xs sm:text-base font-extrabold tracking-tight block leading-tight">
             {card.title}
           </span>
+          <span class="text-[9px] sm:text-[10px] text-slate-500/80 font-semibold mt-1 block leading-tight line-clamp-2">
+            {card.sub}
+          </span>
+        </div>
+
+        <div class="absolute bottom-[-8px] right-[-8px] w-20 h-20 sm:bottom-[-10px] sm:right-[-10px] sm:w-28 sm:h-28 z-0">
+          <img 
+            src={card.image} 
+            alt="" 
+            loading="lazy"
+            class="w-full h-full object-cover rounded-tl-2xl mix-blend-multiply transition-transform duration-500 group-hover:scale-105"
+          />
+        </div>
+
+        <div class="absolute top-4 right-4 z-10 w-6 h-6 bg-white/80 rounded-full hidden sm:flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-xs">
+          <svg class="w-3.5 h-3.5 {card.textColor}" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+          </svg>
         </div>
       </button>
     {/each}
@@ -81,7 +93,6 @@
 </div>
 
 <style>
-  /* Prevents image dragging */
   img {
     -webkit-user-drag: none;
   }

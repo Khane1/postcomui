@@ -1,263 +1,168 @@
 <!-- lib/components/SidebarNav.svelte -->
 <script>
-  import { browser } from '$app/environment';
+  import { appState } from '$lib/state.svelte.js';
+  import { goto } from '$app/navigation';
 
   let { 
     selectedCategory = "All", 
     fulfillmentMode = "pickup",
     onCategoryChange,
     onFulfillmentChange,
-    onClaimCoupon // Prop added to forward coupon claim actions
+    onClaimCoupon
   } = $props();
 
-  // Reactive state rune tracking active hovered category list
-  let hoveredCategory = $state(null);
+  let showAllDepartments = $state(false);
 
-  // Compact ad state
-  let currentMiniSlide = $state(0);
-  let momoActivated = $state(false);
-
-  const categories = [
-    { id: "All", label: "Explore All", icon: "M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" },
-    { id: "Agro Products", label: "Agro Products", icon: "M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m0-12.728l.707.707m12.728 12.728l.707-.707M21 12a9 9 0 11-18 0 9 9 0 0118 0z" },
-    { id: "Food & Beverages", label: "Food & Beverages", icon: "M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" },
-    { id: "Arts & Crafts", label: "Arts & Crafts", icon: "M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" }
+  // Instacart Sidebar Menu Map (Aligned to Postcom categories)
+  const primaryMenu = [
+    { id: "All", label: "Home", type: "home", icon: "home" },
+    { id: "Agro Products", label: "Grocery (Agro)", type: "category", icon: "grocery" },
+    { id: "Food & Beverages", label: "Beverages & Staples", type: "category", icon: "restaurants" },
+    { id: "Arts & Crafts", label: "Arts & Retail", type: "category", icon: "retail" },
+    { id: "Offers", label: "Offers", type: "route", icon: "offers" }
   ];
 
-  const subcategoriesMap = {
-    "All": {
-      items: ["Harvest Campaigns", "Newly Listed Products", "Best Selling Items", "Subsidized Courier Deals"],
-      promo: { title: "National Logistics", desc: "Get subsidized flat rate shipping slots countrywide." }
-    },
-    "Agro Products": {
-      items: ["Organic Seeds & Seedlings", "Natural Soil Fertilizers", "Manual Farming Hand-Tools", "Micro Irrigation Kits"],
-      promo: { title: "Posta Verified Agro", desc: "100% authenticated inputs directly sourced from verified cooperatives." }
-    },
-    "Food & Beverages": {
-      items: ["Raw Honey & Natural Syrups", "Grains, Tubers & Flours", "Premium Coffee & Tea Blends", "Sun-Dried Fish & Pulses"],
-      promo: { title: "Freshness Standards", desc: "Dispatched in humidity-controlled postal logistics crates." }
-    },
-    "Arts & Crafts": {
-      items: ["Barkcloth Home Collections", "Handwoven Sisal Baskets", "Polished Mahogany Carvings", "Cultural Beaded Adornments"],
-      promo: { title: "UNESCO Heritage", desc: "Certified authentic artisan crafts backing rural cooperatives." }
-    }
-  };
-
-  // Mini-sized promotional ads tailored for the sidebar width (w-64)
-  const miniSlides = [
-    {
-      bg: 'bg-emerald-800',
-      eyebrow: 'Agro Specials',
-      headline: 'Farm Fresh Deals',
-      sub: 'Save up to 40% on fresh produce direct from Luweero & Kasese.',
-      cta: 'Claim Coupon',
-      badge: '-40%',
-      coupon: 'HARVEST40'
-    },
-    {
-      bg: 'bg-purple-800',
-      eyebrow: 'Made in Uganda',
-      headline: 'Artisan Crafts',
-      sub: 'Authentic handmade goods supporting rural cooperatives.',
-      cta: 'Claim Coupon',
-      badge: '-25%',
-      coupon: 'CRAFT25'
-    },
-    {
-      bg: 'bg-amber-800',
-      eyebrow: 'Food & Drinks',
-      headline: 'Local Favorites',
-      sub: 'Premium honey, coffees, and teas delivered straight to your door.',
-      cta: 'Claim Coupon',
-      badge: '-20%',
-      coupon: 'FOOD20'
-    }
+  const secondaryMenu = [
+    { id: "Health & Beauty", label: "Health & Beauty", type: "category", icon: "convenience" },
+    { id: "Lockers", label: "Smart Pickups", type: "route", icon: "convenience" }
   ];
 
-  function handleMiniCTA(coupon) {
-    onClaimCoupon?.(coupon);
+  // Handles navigation and automatically closes drawer on mobile
+  function handleNavigate(item) {
+    appState.isSidebarOpen = false; // Smooth slide close on select
+    
+    if (item.type === "home") {
+      onCategoryChange?.("All");
+      goto("/");
+    } else if (item.type === "category") {
+      onCategoryChange?.(item.id);
+      goto("/products");
+    } else if (item.type === "route") {
+      if (item.id === "Offers") {
+        appState.addToast("Clip exclusive farm codes directly in checkout!", "info");
+      } else {
+        appState.isLocationModalOpen = true;
+      }
+    }
   }
-
-  function handleSidebarMoMo() {
-    if (momoActivated) return;
-    momoActivated = true;
-    onClaimCoupon?.('MOMOSAVE');
-    setTimeout(() => { momoActivated = false; }, 2500);
-  }
-
-  // Handle slide rotation logic
-  $effect(() => {
-    if (!browser) return;
-    const interval = setInterval(() => {
-      currentMiniSlide = (currentMiniSlide + 1) % miniSlides.length;
-    }, 5000);
-    return () => clearInterval(interval);
-  });
 </script>
 
-<!-- Aside wrapper container handles mouseleave to collapse active flyouts -->
+<!-- Responsive layout: Fixed Drawer on mobile, sticky inline viewport panel on lg -->
 <aside 
-  onmouseleave={() => hoveredCategory = null}
-  class="hidden lg:flex w-64 bg-slate-50/50 border-r border-slate-200 flex-col justify-between p-5 flex-shrink-0 relative z-30 min-h-screen"
+  class="fixed inset-y-0 left-0 z-50 lg:sticky lg:top-[73px] lg:h-[calc(100vh-73px)] lg:overflow-y-auto lg:z-30 lg:flex w-60 bg-white border-r border-slate-100/50 flex-col justify-between p-4 flex-shrink-0 select-none font-sans transition-transform duration-300 ease-in-out lg:transform-none [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden
+    {appState.isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'} "
 >
-  <div class="space-y-5">
-    
-    <!-- Fulfillment Toggle -->
-    
+  
+  <div class="space-y-4">
+    <!-- Header Row -->
+    <div class="flex items-center justify-between">
+      <h3 class="text-[10px] font-extrabold tracking-widest text-slate-400 uppercase select-none">Categories</h3>
+      <button 
+        onclick={() => appState.isSidebarOpen = false}
+        class="lg:hidden text-slate-400 hover:text-slate-600 focus:outline-none p-1"
+        aria-label="Close sidebar"
+      >
+        <svg class="w-4.5 h-4.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+    </div>
 
-    <!-- Navigation Anchor Links -->
-    <nav class="space-y-1.5 relative" aria-label="Sidebar main navigation">
-      {#each categories as cat}
-        {@const isSelected = selectedCategory === cat.id}
-        {@const isHovered = hoveredCategory === cat.id}
-
+    <!-- Main Instacart Category Block -->
+    <nav class="space-y-1" aria-label="Sidebar navigation">
+      {#each primaryMenu as item}
+        {@const isSelected = selectedCategory === item.id || (item.id === "All" && selectedCategory === "All" && appState.searchQuery === "")}
+        
         <button 
-          onmouseenter={() => hoveredCategory = cat.id}
-          onclick={() => { onCategoryChange?.(cat.id); hoveredCategory = null; }}
-          class="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold transition-all border group
+          onclick={() => handleNavigate(item)}
+          class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[14px] font-semibold transition-all text-left focus:outline-none
             {isSelected 
-              ? 'bg-slate-900 border-slate-900 text-white shadow-sm' 
-              : isHovered 
-                ? 'bg-red-50 border-red-100/50 text-red-600' 
-                : 'text-slate-600 border-transparent hover:bg-slate-200/50 hover:text-slate-950'}"
+              ? 'bg-black text-white shadow-xs' 
+              : 'text-slate-800 hover:bg-[#F1EFE9]'}"
         >
-          <div class="flex items-center gap-3">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" d={cat.icon}/>
-            </svg>
-            <span>{cat.label}</span>
-          </div>
-          
-          <svg class="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-all transform group-hover:translate-x-0.5
-            {isSelected ? 'text-white' : isHovered ? 'text-red-500' : 'text-slate-400'}" 
-            fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"
-          >
-            <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+          <!-- SVG Icon matching -->
+          <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" stroke-width="2.1" viewBox="0 0 24 24">
+            {#if item.icon === "home"}
+              <path stroke-linecap="round" stroke-linejoin="round" d="m2.25 12 8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" />
+            {:else if item.icon === "grocery"}
+              <!-- Premium Banana crescent shape outline -->
+              <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 3.5a16.5 16.5 0 0 1-5.1 11c-3.1 3.1-7.1 4-9 2s-1.1-5.9 2-9a16.5 16.5 0 0 1 11-5m1.1 1c1 1 1.7 2.7 1.7 4.2a6.4 6.4 0 0 1-1.7 3.8C16.5 13.5 13 14.5 11 14.5" />
+            {:else if item.icon === "restaurants"}
+              <!-- Cloche/Dish icon outline -->
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.25v-1.5m-9 12h18m-18 0a1.5 1.5 0 0 0 1.5 1.5h15a1.5 1.5 0 0 0 1.5-1.5m-18 0c0-4.5 3.582-8 8-8s8 3.5 8 8" />
+            {:else if item.icon === "retail"}
+              <!-- Shopping Bag outline -->
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 10.5V6a3.75 3.75 0 1 0-7.5 0v4.5m11.356-1.993 1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 0 1-1.12-1.243l1.264-12A1.125 1.125 0 0 1 5.513 7.5h12.974c.576 0 1.059.435 1.119 1.007ZM8.625 10.5a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm7.5 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" />
+            {:else if item.icon === "offers"}
+              <!-- Price tag outline -->
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9.568 3H5.25A2.25 2.25 0 0 0 3 5.25v4.318c0 .597.237 1.17.659 1.591l6.499 6.499c.404.404 1.058.404 1.462 0l4.318-4.318a1.056 1.056 0 0 0 0-1.462L9.568 3.659A2.25 2.25 0 0 0 9.568 3Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M6 6h.008v.008H6V6Z" />
+            {/if}
           </svg>
+          <span class="tracking-tight">{item.label}</span>
         </button>
       {/each}
 
-      <!-- EXPANDED HIGH-FIDELITY MEGA MENU FLYOUT -->
-      {#if hoveredCategory && subcategoriesMap[hoveredCategory]}
-        <div class="absolute left-full pl-3 top-0 w-[540px] z-50">
-          <div class="bg-white border border-slate-200 rounded-2xl shadow-2xl p-6 border-l-slate-300 grid grid-cols-12 gap-5">
-            
-            <!-- Left Side: Subcategory List (Cols 1-7) -->
-            <div class="col-span-7 space-y-3">
-              <h4 class="text-[10px] font-black tracking-widest text-slate-400 uppercase select-none">
-                {hoveredCategory} Categories
-              </h4>
-              <ul class="space-y-1">
-                {#each subcategoriesMap[hoveredCategory].items as sub}
-                  <li>
-                    <button 
-                      onclick={() => { onCategoryChange?.(hoveredCategory); hoveredCategory = null; }}
-                      class="w-full text-left py-2 px-3 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-50 hover:text-slate-950 transition-colors flex items-center justify-between group"
-                    >
-                      <span>{sub}</span>
-                      <svg class="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 text-red-600 transition-opacity" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
-                      </svg>
-                    </button>
-                  </li>
-                {/each}
-              </ul>
-            </div>
-
-            <!-- Right Side: Focus Highlight Card (Cols 8-12) -->
-            <div class="col-span-5 bg-slate-50/80 border border-slate-100 p-4 rounded-xl flex flex-col justify-between">
-              <div class="space-y-1.5">
-                <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Featured Focus</span>
-                <h5 class="text-xs font-extrabold text-slate-900 leading-snug">
-                  {subcategoriesMap[hoveredCategory].promo.title}
-                </h5>
-                <p class="text-[10px] text-slate-500 leading-relaxed font-medium">
-                  {subcategoriesMap[hoveredCategory].promo.desc}
-                </p>
-              </div>
-              <div class="pt-3 border-t border-slate-200/60 flex items-center justify-between text-[9px] font-black text-red-600 uppercase tracking-wider">
-                <span>Posta Inspected</span>
-                <span>Subsidized</span>
-              </div>
-            </div>
-
-          </div>
-        </div>
+      <!-- Dynamic Expandable items under the "Show More" Trigger -->
+      {#if showAllDepartments}
+        {#each secondaryMenu as item}
+          <button 
+            onclick={() => handleNavigate(item)}
+            class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[14px] font-semibold transition-all text-left text-slate-800 hover:bg-[#F1EFE9] focus:outline-none"
+          >
+            <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" stroke-width="2.1" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="9" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 6v6l4 2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span class="tracking-tight">{item.label}</span>
+          </button>
+        {/each}
       {/if}
+
+      <!-- Expand Toggle Link -->
+      <button 
+        onclick={() => showAllDepartments = !showAllDepartments}
+        class="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-[14px] font-semibold text-slate-700 hover:bg-[#F1EFE9] focus:outline-none text-left"
+      >
+        <span>{showAllDepartments ? 'Show less' : 'Show more'}</span>
+        <svg class="w-4 h-4 text-slate-500 transform transition-transform {showAllDepartments ? 'rotate-180' : ''}" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
+        </svg>
+      </button>
     </nav>
 
-    <!-- COMPACT SIDEBAR INTERACTIVE ADS -->
-    <div class="space-y-3 pt-2">
-      <!-- Dynamic Rotating Promo Ad -->
-      <div 
-        class="relative overflow-hidden rounded-xl text-white p-4 {miniSlides[currentMiniSlide].bg} transition-all duration-500 shadow-sm flex flex-col justify-between min-h-[145px] group cursor-pointer"
-        onclick={() => handleMiniCTA(miniSlides[currentMiniSlide].coupon)}
+    <!-- Separator Rule -->
+    <div class="border-t border-slate-200/60 my-2"></div>
+
+    <!-- YOU SECTION -->
+    <div class="space-y-1">
+      <h3 class="px-3 text-[14px] font-black text-slate-900 tracking-tight select-none">You</h3>
+      
+      <!-- Flyers/My Orders Link -->
+      <button 
+        onclick={() => { appState.isSidebarOpen = false; goto('/cart'); }}
+        class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[14px] font-semibold text-slate-800 hover:bg-[#F1EFE9] focus:outline-none text-left"
       >
-        <!-- Background blob decoration -->
-        <div class="absolute -right-4 -top-4 w-14 h-14 rounded-full bg-white/10 pointer-events-none group-hover:scale-110 transition-transform"></div>
-        
-        <div>
-          <div class="flex justify-between items-start gap-1">
-            <span class="text-[8px] font-extrabold uppercase tracking-wider bg-black/20 px-1.5 py-0.5 rounded">
-              {miniSlides[currentMiniSlide].eyebrow}
-            </span>
-            <span class="text-[9px] font-black text-amber-300 bg-black/30 px-1.5 py-0.5 rounded">
-              {miniSlides[currentMiniSlide].badge}
-            </span>
-          </div>
-          
-          <h5 class="text-xs font-black mt-2 leading-snug">
-            {miniSlides[currentMiniSlide].headline}
-          </h5>
-          <p class="text-[9px] text-white/80 mt-1 leading-normal font-medium">
-            {miniSlides[currentMiniSlide].sub}
-          </p>
-        </div>
+        <svg class="w-5 h-5 text-slate-800" fill="none" stroke="currentColor" stroke-width="2.1" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+        </svg>
+        <span>Flyers</span>
+      </button>
 
-        <button 
-          onclick={(e) => { e.stopPropagation(); handleMiniCTA(miniSlides[currentMiniSlide].coupon); }}
-          class="w-full mt-3 bg-white hover:bg-slate-50 text-slate-950 text-[10px] font-extrabold py-1 rounded-lg transition-all active:scale-98 shadow-xs"
-        >
-          {miniSlides[currentMiniSlide].cta}
-        </button>
-      </div>
-
-      <!-- Compact MTN MoMo Promo -->
-      <div class="bg-amber-400 p-4 rounded-xl flex flex-col justify-between relative overflow-hidden min-h-[115px] shadow-sm">
-        <div class="absolute -right-6 -bottom-6 w-16 h-16 rounded-full bg-black/5 pointer-events-none"></div>
-        <div>
-          <span class="text-[8px] font-extrabold text-amber-950 uppercase tracking-widest bg-amber-500/30 px-1.5 py-0.5 rounded">
-            MTN MoMo
-          </span>
-          <h5 class="text-xs font-black text-amber-950 mt-1.5 leading-tight">
-            Get UGX 1,500 Cash-Back
-          </h5>
-          <p class="text-[9px] text-amber-900 mt-1 leading-normal font-medium">
-            On every order completed with MTN Mobile Money.
-          </p>
-        </div>
-        <button 
-          onclick={handleSidebarMoMo}
-          class="w-full mt-3 text-[10px] font-extrabold py-1 rounded-lg transition-all active:scale-98 shadow-xs
-            {momoActivated ? 'bg-emerald-700 text-white' : 'bg-slate-950 hover:bg-slate-900 text-amber-400'}"
-        >
-          {momoActivated ? '✓ Coupon Active!' : 'Activate — MOMOSAVE'}
-        </button>
-      </div>
+      <!-- Account Profile Link -->
+      <button 
+        onclick={() => { appState.isSidebarOpen = false; goto('/cart'); }}
+        class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[14px] font-semibold text-slate-800 hover:bg-[#F1EFE9] focus:outline-none text-left"
+      >
+        <svg class="w-5 h-5 text-slate-800" fill="none" stroke="currentColor" stroke-width="2.1" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M17.982 18.725A7.488 7.488 0 0 0 12 15.75a7.488 7.488 0 0 0-5.982 2.975m11.963 0a9 9 0 1 0-11.963 0m11.963 0A8.966 8.966 0 0 1 12 21a8.966 8.966 0 0 1-5.982-2.275M15 9.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+        </svg>
+        <span>Account</span>
+      </button>
     </div>
-
   </div>
 
-  <!-- Vendor Access Section -->
-  <div class="bg-slate-200/50 p-4 rounded-2xl border border-slate-200 flex-shrink-0 mt-5">
-    <p class="text-[10px] font-black tracking-wider text-slate-400 uppercase">Vendor Access</p>
-    <p class="text-xs text-slate-600 font-bold mt-1">Sell on Postcom to reach national buyers.</p>
-    <a href="#register" class="text-xs text-red-600 font-black hover:underline mt-2 inline-block">Enroll Shop →</a>
-  </div>
-
-   <div class="bg-slate-200/50 p-4 rounded-2xl border border-slate-200 flex-shrink-0">
-    <p class="text-[10px] font-black tracking-wider text-slate-400 uppercase">Vendor Access</p>
-    <p class="text-xs text-slate-600 font-bold mt-1">Sell on Postcom to reach national buyers.</p>
-    <a href="#register" class="text-xs text-red-600 font-black hover:underline mt-2 inline-block">Enroll Shop →</a>
+  <!-- Unified cooperative disclaimer badge -->
+  <div class="bg-[#F1EFE9]/40 p-3.5 rounded-xl border border-slate-200/50 mt-auto select-none">
+    <p class="text-[9px] font-bold text-slate-400 tracking-wider uppercase">ePosta Network</p>
+    <p class="text-[11px] text-slate-600 font-bold mt-1 leading-snug">Flat-rate national postage logistics active.</p>
   </div>
 </aside>

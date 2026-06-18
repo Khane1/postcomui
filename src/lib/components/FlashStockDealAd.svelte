@@ -1,4 +1,3 @@
-<!-- lib/components/FlashStockDealAd.svelte -->
 <script>
   import { browser } from '$app/environment';
 
@@ -6,10 +5,10 @@
 
   let remainingStock = $state(9);
   let totalStock = 15;
-  let secondsLeft = $state(840); // 14 minutes
+  let secondsLeft = $state(840);
   let isClaimed = $state(false);
+  let pulseTrigger = $state(false);
 
-  // Derive simple timer format
   let timeString = $derived(
     `${Math.floor(secondsLeft / 60)}m ${String(secondsLeft % 60).padStart(2, '0')}s`
   );
@@ -18,18 +17,18 @@
     if (isClaimed) return;
     isClaimed = true;
     remainingStock--;
+    pulseTrigger = true;
+    setTimeout(() => pulseTrigger = false, 500);
     onClaimCoupon?.("HONEY30");
   }
 
   $effect(() => {
     if (!browser) return;
 
-    // Slowly decrease countdown timer
     const timer = setInterval(() => {
       if (secondsLeft > 0) secondsLeft--;
     }, 1000);
 
-    // Occasional simulated stock purchase
     const stockTimer = setInterval(() => {
       if (remainingStock > 2 && Math.random() > 0.7) {
         remainingStock--;
@@ -43,9 +42,8 @@
   });
 </script>
 
-<div class="bg-red-50/70 border border-red-200/50 p-3.5 rounded-xl flex flex-col justify-between min-h-[155px] shadow-xs">
+<div class="bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200/50 p-3.5 rounded-xl flex flex-col justify-between min-h-[155px] shadow-xs hover:shadow-md transition-all hover:scale-[1.01]">
   <div>
-    <!-- Header -->
     <div class="flex justify-between items-center">
       <span class="text-[8px] font-black uppercase tracking-wider text-red-700 bg-red-100 px-1.5 py-0.5 rounded">
         Flash Overstock
@@ -56,43 +54,47 @@
       </span>
     </div>
 
-    <!-- Product Info -->
     <div class="mt-2">
       <h5 class="text-xs font-black text-slate-900 leading-snug">Kitgum Wildflower Honey (1KG)</h5>
       <div class="flex items-baseline gap-1.5 mt-0.5">
-        <span class="text-xs font-bold text-red-600">UGX 16,000</span>
+        <span class="text-xs font-bold text-green-600">UGX 16,000</span>
         <span class="text-[9px] text-slate-400 line-through">UGX 24,000</span>
       </div>
     </div>
 
-    <!-- Depleting Inventory Bar -->
     <div class="mt-3.5 space-y-1">
       <div class="flex justify-between text-[8px] font-bold text-slate-500">
         <span>Stock Status</span>
-        <span>{remainingStock} of {totalStock} jars left</span>
+        <span class={remainingStock <= 4 ? 'text-red-600 font-black' : ''}>{remainingStock} of {totalStock} jars left</span>
       </div>
       <div class="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
         <div 
-          class="bg-red-500 h-full transition-all duration-1000 rounded-full"
+          class="bg-gradient-to-r from-green-500 to-emerald-500 h-full transition-all duration-1000 rounded-full"
           style="width: {(remainingStock / totalStock) * 100}%"
         ></div>
       </div>
     </div>
   </div>
 
-  <!-- Action Button -->
   <button 
     onclick={handleClaim}
     disabled={remainingStock <= 0}
-    class="w-full mt-3.5 text-[10px] font-extrabold py-1.5 rounded-lg transition-all active:scale-98
+    class="w-full mt-3.5 text-[10px] font-extrabold py-1.5 rounded-lg transition-all active:scale-95
       {isClaimed 
         ? 'bg-emerald-600 text-white' 
-        : 'bg-red-600 hover:bg-red-700 text-white shadow-xs'}"
+        : remainingStock <= 0
+          ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+          : 'bg-green-600 hover:bg-green-700 text-white shadow-xs hover:shadow-md'}"
   >
     {#if remainingStock <= 0}
       Sold Out
     {:else if isClaimed}
-      ✓ Coupon Claimed — HONEY30
+      <span class="flex items-center justify-center gap-1">
+        <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+        </svg>
+        Coupon Claimed — HONEY30
+      </span>
     {:else}
       Lock in 30% Off
     {/if}

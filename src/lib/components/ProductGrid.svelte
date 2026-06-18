@@ -1,14 +1,14 @@
 <!-- ProductGrid.svelte -->
 <script>
   import ProductCard from './ProductCard.svelte';
-
   let { 
     products = [], 
     favoritedMap = {}, 
     title = "Current Catalog Offerings",
     onProductSelect,
     onToggleFavorite,
-    onAddToCart
+    onAddToCart,
+    grid=false,
   } = $props();
 </script>
 
@@ -29,8 +29,10 @@
       </div>
     {:else}
       <!-- Dense, responsive grid customized for compact cards -->
-      <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols- gap-3 sm:gap-4 max-w-7xl">
+      <div class="grid grid-cols-2  sm:grid-cols-3 md:grid-cols-4 sm:gap-4 {grid ? '2xl:grid-cols-6 xl:grid-cols-4' : '2xl:grid-cols-8 xl:grid-cols-6'} gap-2 ">
         {#each products as product (product.id)}
+        <div class="w-[170px] sm:w-[180px] ">
+        
           <ProductCard 
             {product}
             isFavorited={!!favoritedMap[product.id]}
@@ -38,6 +40,7 @@
             {onToggleFavorite}
             {onAddToCart}
           />
+        </div>
         {/each}
       </div>
     {/if}

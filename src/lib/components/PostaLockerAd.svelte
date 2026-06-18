@@ -1,8 +1,7 @@
-<!-- lib/components/PostaLockerAd.svelte -->
 <script>
   let { onClaimCoupon } = $props();
 
-  let activeTab = $state('how'); // 'how' | 'benefit'
+  let activeTab = $state('how');
   let isClaimed = $state(false);
 
   function handleClaim() {
@@ -11,31 +10,32 @@
   }
 </script>
 
-<div class="bg-slate-900 text-slate-100 p-3.5 rounded-xl flex flex-col justify-between min-h-[165px] relative overflow-hidden shadow-xs">
-  <!-- Interactive tab navigation to save height -->
+<div class="bg-gradient-to-br from-slate-900 to-slate-800 text-slate-100 p-3.5 rounded-xl flex flex-col justify-between min-h-[165px] relative overflow-hidden shadow-xs hover:shadow-md transition-all hover:scale-[1.01]">
+  <div class="absolute -right-6 -bottom-6 w-24 h-24 rounded-full bg-emerald-500/5 pointer-events-none"></div>
+  <div class="absolute -left-4 -top-4 w-16 h-16 rounded-full bg-emerald-500/5 pointer-events-none"></div>
+  
   <div>
     <div class="flex justify-between items-center border-b border-slate-800 pb-1.5">
-      <span class="text-[8px] font-black uppercase tracking-wider text-emerald-400 bg-emerald-950 px-1.5 py-0.5 rounded">
+      <span class="text-[8px] font-black uppercase tracking-wider text-emerald-400 bg-emerald-950/50 px-1.5 py-0.5 rounded">
         Smart Pickups
       </span>
       <div class="flex gap-2">
         <button 
           onclick={() => activeTab = 'how'}
-          class="text-[9px] font-bold transition-colors {activeTab === 'how' ? 'text-white underline decoration-emerald-400' : 'text-slate-500'}"
+          class="text-[9px] font-bold transition-colors {activeTab === 'how' ? 'text-white underline decoration-emerald-400' : 'text-slate-500 hover:text-slate-300'}"
         >
           How It Works
         </button>
         <button 
           onclick={() => activeTab = 'benefit'}
-          class="text-[9px] font-bold transition-colors {activeTab === 'benefit' ? 'text-white underline decoration-emerald-400' : 'text-slate-500'}"
+          class="text-[9px] font-bold transition-colors {activeTab === 'benefit' ? 'text-white underline decoration-emerald-400' : 'text-slate-500 hover:text-slate-300'}"
         >
           Benefits
         </button>
       </div>
     </div>
 
-    <!-- Dynamic Context Area -->
-    <div class="mt-2.5">
+    <div class="mt-2.5 transition-all duration-200">
       {#if activeTab === 'how'}
         <h5 class="text-xs font-bold leading-tight">Pick up on your schedule</h5>
         <p class="text-[9px] text-slate-400 mt-1 leading-normal">
@@ -52,11 +52,19 @@
     </div>
   </div>
 
-  <!-- Promotional Action Button -->
   <button 
     onclick={handleClaim}
-    class="w-full mt-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-[10px] font-extrabold py-1.5 rounded-lg transition-all active:scale-98 shadow-xs"
+    class="w-full mt-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-[10px] font-extrabold py-1.5 rounded-lg transition-all active:scale-95 shadow-xs hover:shadow-md"
   >
-    {isClaimed ? 'Code claimed: FREEBOX' : 'Try Free Lockers — Code FREEBOX'}
+    {#if isClaimed}
+      <span class="flex items-center justify-center gap-1">
+        <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+        </svg>
+        Code claimed: FREEBOX
+      </span>
+    {:else}
+      Try Free Lockers — Code FREEBOX
+    {/if}
   </button>
 </div>

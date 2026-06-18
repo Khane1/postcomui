@@ -85,7 +85,27 @@ export const products = [
     ],
     placeholder: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'><rect width='100%' height='100%' fill='%23f1f5f9'/></svg>"
   },
-  
+  {
+    id: 5,
+    name: "Bundibugyo Bourbon Vanilla Beans (Premium Grade A, 100g)",
+    category: "Agro Products",
+    price: 45000,
+    originalPrice: 50000,
+    rating: 4.9,
+    reviews: 73,
+    seller: "Rwenzori Vanilla Association",
+    badge: "Export Grade",
+    stockStatus: "Many in stock",
+    origin: "Bundibugyo District, Western Uganda",
+    altitude: "1,400m ASL",
+    process: "Sun-Cured & Aged",
+    description: "Grown on the mist-covered foothills of the Rwenzori Mountains, these Grade A Bourbon vanilla pods are highly oily, plump, and deeply aromatic, rich in vanillin and ideal for high-end baking.",
+    images: [
+      "https://images.unsplash.com/photo-1595122245594-a55086ee50a6?auto=format&fit=crop&q=80&w=600",
+      "https://images.unsplash.com/photo-1608248597279-f99d160bfcbc?auto=format&fit=crop&q=80&w=600"
+    ],
+    placeholder: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'><rect width='100%' height='100%' fill='%23f1f5f9'/></svg>"
+  },
   {
     id: 6,
     name: "Pure Nile Shea Butter - Raw Cold-Pressed (500g)",
@@ -192,24 +212,129 @@ export const products = [
     placeholder: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'><rect width='100%' height='100%' fill='%23f1f5f9'/></svg>"
   },
   {
-    id: 5,
-    name: "Bundibugyo Bourbon Vanilla Beans (Premium Grade A, 100g)",
+    id: 11,
+    name: "Mbarara Premium Highland Matooke (Fresh Green Cluster, 5kg)",
     category: "Agro Products",
-    price: 45000,
-    originalPrice: 50000,
-    rating: 4.9,
-    reviews: 73,
-    seller: "Rwenzori Vanilla Association",
-    badge: "Export Grade",
+    price: 14500,
+    originalPrice: 18000,
+    rating: 4.8,
+    reviews: 110,
+    seller: "Ankole Farmers Cooperative",
+    badge: "Harvest Special",
     stockStatus: "Many in stock",
-    origin: "Bundibugyo District, Western Uganda",
-    altitude: "1,400m ASL",
-    process: "Sun-Cured & Aged",
-    description: "Grown on the mist-covered foothills of the Rwenzori Mountains, these Grade A Bourbon vanilla pods are highly oily, plump, and deeply aromatic, rich in vanillin and ideal for high-end baking.",
+    origin: "Mbarara, South-Western Uganda",
+    altitude: "1,450m ASL",
+    process: "Harvest-to-Order",
+    description: "Plump, premium green highland bananas (matooke) harvested at peak starch maturity. Rich, creamy texture when steamed, perfect for traditional Luwombo.",
     images: [
-      "https://images.unsplash.com/photo-1608248597279-f99d160bfcbc?auto=format&fit=crop&q=80&w=600",
-      "https://images.unsplash.com/photo-1595122245594-a55086ee50a6?auto=format&fit=crop&q=80&w=600"
+      "https://images.unsplash.com/photo-1518843875459-f738682238a6?w=600&q=80",
+      "https://images.unsplash.com/photo-1528825871115-3581a5387919?w=600&q=80"
     ],
     placeholder: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'><rect width='100%' height='100%' fill='%23f1f5f9'/></svg>"
   },
+  {
+    id: 12,
+    name: "Luweero Organic Dried Mango Slices (Sulfur-Free, 200g)",
+    category: "Food & Beverages",
+    price: 7500,
+    originalPrice: 9000,
+    rating: 4.7,
+    reviews: 45,
+    seller: "Luweero Fruit Growers Union",
+    badge: "Best Seller",
+    stockStatus: "Many in stock",
+    origin: "Luweero District",
+    altitude: "1,110m ASL",
+    process: "Solar Dehydrated",
+    description: "Chewy, naturally sweet slices of local Kent and Keitt mangoes. Solar-dehydrated with zero added sugar, sulfur, or preservatives. A perfect high-energy snack.",
+    images: [
+      "https://images.unsplash.com/photo-1601004890684-d8cbf643f5f2?w=600&q=80",
+      "https://images.unsplash.com/photo-1553530979-7ee52a2670c4?w=600&q=80"
+    ],
+    placeholder: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'><rect width='100%' height='100%' fill='%23f1f5f9'/></svg>"
+  },
+  {
+    id: 13,
+    name: "Moringa & Cold-Pressed Neem Healing Soap (Pack of 3, 300g)",
+    category: "Health & Beauty",
+    price: 12500,
+    originalPrice: 15000,
+    rating: 4.6,
+    reviews: 38,
+    seller: "Northern Shea Organics",
+    badge: "Anti-Bacterial",
+    stockStatus: "Many in stock",
+    origin: "Gulu, Northern Uganda",
+    altitude: "1,070m ASL",
+    process: "Cold-Process Handcrafted",
+    description: "Formulated with pure wild moringa leaf powder and organic neem oil. Deeply cleansing and soothing for sensitive or acne-prone skin, naturally antibacterial.",
+    images: [
+      "https://images.unsplash.com/photo-1540555700478-4be289fbecef?w=600&q=80",
+      "https://images.unsplash.com/photo-1608248597279-f99d160bfcbc?w=600&q=80"
+    ],
+    placeholder: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'><rect width='100%' height='100%' fill='%23f1f5f9'/></svg>"
+  },
+  {
+    id: 14,
+    name: "Kampala Premium Royal Robusta Roasted Coffee (Medium-Dark, 500g)",
+    category: "Food & Beverages",
+    price: 19500,
+    originalPrice: 22000,
+    rating: 4.9,
+    reviews: 83,
+    seller: "Kibinge Coffee Growers Co-op",
+    badge: "Direct Trade",
+    stockStatus: "Many in stock",
+    origin: "Bukomansimbi District",
+    altitude: "1,200m ASL",
+    process: "Natural Dried",
+    description: "Fine robusta coffee known globally for its intense body and chocolate-malt undertones. Grown by sustainable smallholder farms in Kibinge.",
+    images: [
+      "https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=600&q=80",
+      "https://images.unsplash.com/photo-1447933601403-0c6688de566e?w=600&q=80"
+    ],
+    placeholder: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'><rect width='100%' height='100%' fill='%23f1f5f9'/></svg>"
+  },
+  {
+    id: 15,
+    name: "Kasese Birds-Eye Dried Hot Chili Peppers (Premium Fire, 100g)",
+    category: "Agro Products",
+    price: 6000,
+    originalPrice: 7500,
+    rating: 4.9,
+    reviews: 54,
+    seller: "Rwenzori Spice Association",
+    badge: "Spicy Select",
+    stockStatus: "Many in stock",
+    origin: "Kasese, Rwenzori Foothills",
+    altitude: "1,350m ASL",
+    process: "Raised Net-Dried",
+    description: "Screaming hot, deep-red bird's eye chilies grown organically on the foothills of the Rwenzori mountains. Hand-sorted and sun-dried.",
+    images: [
+      "https://images.unsplash.com/photo-1588252393763-67989039115e?w=600&q=80",
+      "https://images.unsplash.com/photo-1518013002796-657ab50f56e9?w=600&q=80"
+    ],
+    placeholder: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'><rect width='100%' height='100%' fill='%23f1f5f9'/></svg>"
+  },
+  {
+    id: 16,
+    name: "Barkcloth Heritage Motif Wall Panel (Medium, Hand-Painted)",
+    category: "Arts & Crafts",
+    price: 120000,
+    originalPrice: 145000,
+    rating: 4.9,
+    reviews: 12,
+    seller: "Kampala Artisans Guild",
+    badge: "Heritage Spec",
+    stockStatus: "Only 1 left",
+    origin: "Masaka District",
+    altitude: "1,150m ASL",
+    process: "Sought-After Bark Beat",
+    description: "A premium cultural art panel crafted from beating Mutuba barkcloth. Hand-painted with deep natural charcoal pigments representing ancient Ganda motifs.",
+    images: [
+      "https://images.unsplash.com/photo-1524498250077-390f9e378fc0?w=600&q=80",
+      "https://images.unsplash.com/photo-1544816155-12df9643f363?w=600&q=80"
+    ],
+    placeholder: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'><rect width='100%' height='100%' fill='%23f1f5f9'/></svg>"
+  }
 ];

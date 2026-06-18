@@ -9,7 +9,10 @@ class AppState {
   isLocationModalOpen = $state(false);
   isSidebarOpen = $state(false); // Mobile drawer toggle state
   toasts = $state([]);
-
+  activeDetailProduct = $state(null); // Global overlay details modal
+  selectedProductForModal = $state(null);
+  isCartOpen = $state(false);
+  isCheckoutOpen = $state(false);
   // Svelte 5 Getter to dynamically calculate derived cart items count
   get cartCount() {
     return this.cartItems.reduce((acc, item) => acc + item.quantity, 0);
@@ -24,7 +27,5 @@ class AppState {
     }, 3000);
   }
 }
-
-
 
 export const appState = new AppState();

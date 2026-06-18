@@ -1,4 +1,3 @@
-<!-- src/lib/components/AdBanners.svelte -->
 <script>
   import { browser } from '$app/environment';
 
@@ -136,6 +135,8 @@
   let seconds = $state(18);
   let buyersCount = $state(1204);
   let momoActivated = $state(false);
+  let confettiPieces = $state([]);
+  let rippleStyle = $state('');
 
   function goSlide(n) {
     currentSlide = ((n % slides.length) + slides.length) % slides.length;
@@ -145,17 +146,47 @@
     goSlide(currentSlide + 1);
   }
 
+  function spawnConfetti(x, y) {
+    const colors = ['#ff6b6b', '#ffd93d', '#6bcb77', '#4d96ff', '#ff6bcb', '#a66cff'];
+    const pieces = [];
+    for (let i = 0; i < 30; i++) {
+      pieces.push({
+        id: i,
+        x: x + (Math.random() - 0.5) * 60,
+        y: y + (Math.random() - 0.5) * 60,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        rotation: Math.random() * 720 - 360,
+        scale: 0.4 + Math.random() * 0.8,
+        delay: Math.random() * 0.15,
+      });
+    }
+    confettiPieces = pieces;
+    setTimeout(() => { confettiPieces = []; }, 1500);
+  }
+
   function handleCTA(e, coupon) {
     e.stopPropagation();
+    const rect = e.currentTarget.getBoundingClientRect();
+    spawnConfetti(rect.left + rect.width / 2, rect.top + rect.height / 2);
     onClaimCoupon?.(coupon);
   }
 
   function handleMoMo(e) {
     e.stopPropagation();
     if (momoActivated) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    spawnConfetti(rect.left + rect.width / 2, rect.top + rect.height / 2);
     momoActivated = true;
     onClaimCoupon?.('MOMOSAVE');
     setTimeout(() => { momoActivated = false; }, 2500);
+  }
+
+  function handleRipple(e) {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    rippleStyle = `left:${x}px;top:${y}px`;
+    setTimeout(() => { rippleStyle = ''; }, 600);
   }
 
   function pad(n) {
@@ -167,7 +198,7 @@
 
     const autoPlay = setInterval(() => {
       currentSlide = (currentSlide + 1) % slides.length;
-    }, 4500);
+    }, 5000);
 
     const clock = setInterval(() => {
       seconds--;
@@ -201,12 +232,10 @@
     onkeydown={(e) => e.key === 'Enter' && handleSlideClick()}
     aria-label="Browse deals carousel"
   >
-    <!-- Geometric accent shapes -->
     <div class="geo geo-1"></div>
     <div class="geo geo-2"></div>
     <div class="geo geo-3"></div>
 
-    <!-- Slide number indicator -->
     <div class="slide-counter">
       <span class="slide-current">{String(currentSlide + 1).padStart(2,'0')}</span>
       <span class="slide-sep"></span>
@@ -214,7 +243,7 @@
     </div>
 
     {#each slides as slide, i}
-      <div class="slide" class:active={i === currentSlide} aria-hidden={i !== currentSlide}>
+      <div class="slide" class:active={i === currentSlide} class:prev={i === currentSlide - 1 || (currentSlide === 0 && i === slides.length - 1)} aria-hidden={i !== currentSlide}>
 
         <div class="slide-content">
           <div class="eyebrow-row">
@@ -222,13 +251,14 @@
           </div>
 
           <div class="headline">
-            {#each slide.headline as line}<div>{line}</div>{/each}
+            {#each slide.headline as line}<div class="headline-line">{line}</div>{/each}
           </div>
 
           <p class="slide-sub">{slide.sub}</p>
 
           <div class="slide-actions">
-            <button class="slide-cta" onclick={(e) => handleCTA(e, slide.coupon)}>
+            <button class="slide-cta" onclick={(e) => { handleRipple(e); handleCTA(e, slide.coupon); }}>
+              <span class="ripple" class:active={!!rippleStyle} style={rippleStyle}></span>
               {slide.cta}
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
                 <path d="M2.5 7h9M7.5 3l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
@@ -261,7 +291,6 @@
       </div>
     {/each}
 
-    <!-- Progress-bar style nav -->
     <div class="slide-nav">
       {#each slides as _, i}
         <button
@@ -275,12 +304,22 @@
         </button>
       {/each}
     </div>
+
+    {#if confettiPieces.length > 0}
+      <div class="confetti-layer">
+        {#each confettiPieces as piece (piece.id)}
+          <span
+            class="confetti-piece"
+            style="--x:{piece.x}px;--y:{piece.y}px;--color:{piece.color};--r:{piece.rotation}deg;--s:{piece.scale};--d:{piece.delay}s"
+          ></span>
+        {/each}
+      </div>
+    {/if}
   </div>
 
   <!-- RIGHT COLUMN -->
   <div class="right-col">
 
-    <!-- MoMo card -->
     <div class="momo-card">
       <div class="momo-header">
         <div class="momo-brand">
@@ -310,7 +349,6 @@
       </button>
     </div>
 
-    <!-- Flash sale -->
     <div class="flash-strip">
       <div class="flash-header">
         <div class="flash-eyebrow">
@@ -340,7 +378,6 @@
 
   </div>
 
-  <!-- LIVE ACTIVITY BAR -->
   <div class="activity-bar">
     <div class="live-badge">
       <span class="live-dot"></span>
@@ -376,7 +413,6 @@
     .banners-wrap { grid-template-columns: 1fr; }
   }
 
-  /* ── HERO ── */
   .hero {
     position: relative;
     overflow: hidden;
@@ -388,7 +424,6 @@
     user-select: none;
   }
 
-  /* Geometric shapes */
   .geo {
     position: absolute;
     border-radius: 4px;
@@ -399,12 +434,14 @@
     border: 1.5px solid rgba(255,255,255,0.1);
     border-radius: 50%;
     right: -50px; top: -60px;
+    animation: geo-float 8s ease-in-out infinite;
   }
   .geo-2 {
     width: 120px; height: 120px;
     border: 1.5px solid rgba(255,255,255,0.07);
     border-radius: 50%;
     right: 30px; top: 20px;
+    animation: geo-float 6s ease-in-out infinite reverse;
   }
   .geo-3 {
     width: 60px; height: 60px;
@@ -412,9 +449,18 @@
     border-radius: 12px;
     transform: rotate(22deg);
     right: 140px; top: -20px;
+    animation: geo-spin 12s linear infinite;
   }
 
-  /* Slide counter */
+  @keyframes geo-float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-12px); }
+  }
+  @keyframes geo-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
   .slide-counter {
     position: absolute;
     top: 18px; left: 20px;
@@ -443,23 +489,25 @@
     letter-spacing: 0.04em;
   }
 
-  /* Slides */
   .slide {
     position: absolute;
     inset: 0;
     display: flex;
     opacity: 0;
-    transform: translateX(12px);
-    transition: opacity 0.5s ease, transform 0.5s ease;
+    transform: translateX(30px) scale(0.97);
+    transition: opacity 0.6s cubic-bezier(0.4,0,0.2,1), transform 0.6s cubic-bezier(0.4,0,0.2,1);
     pointer-events: none;
   }
   .slide.active {
     opacity: 1;
-    transform: translateX(0);
+    transform: translateX(0) scale(1);
     pointer-events: auto;
   }
+  .slide.prev {
+    opacity: 0;
+    transform: translateX(-30px) scale(0.97);
+  }
 
-  /* Content */
   .slide-content {
     position: absolute;
     left: 0; top: 0; bottom: 0;
@@ -498,6 +546,20 @@
     letter-spacing: -0.02em;
   }
 
+  .headline-line {
+    overflow: hidden;
+  }
+  .slide.active .headline-line {
+    animation: headline-bounce 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  }
+  .slide.active .headline-line:nth-child(2) { animation-delay: 0.08s; }
+  .slide.active .headline-line:nth-child(3) { animation-delay: 0.16s; }
+
+  @keyframes headline-bounce {
+    0% { opacity: 0; transform: translateY(20px) scale(0.9); }
+    100% { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
   .slide-sub {
     font-size: 11px;
     color: rgba(255,255,255,0.72);
@@ -506,12 +568,23 @@
     font-weight: 400;
     max-width: 220px;
   }
+  .slide.active .slide-sub {
+    animation: fade-up 0.5s ease 0.2s both;
+  }
+
+  @keyframes fade-up {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
 
   .slide-actions {
     display: flex;
     align-items: center;
     gap: 10px;
     flex-wrap: wrap;
+  }
+  .slide.active .slide-actions {
+    animation: fade-up 0.5s ease 0.3s both;
   }
 
   .slide-cta {
@@ -530,9 +603,27 @@
     align-items: center;
     gap: 6px;
     transition: transform 0.15s ease, background 0.15s ease;
+    position: relative;
+    overflow: hidden;
   }
-  .slide-cta:hover { background: #f2f2f2; transform: translateY(-1px); }
-  .slide-cta:active { transform: scale(0.97); }
+  .slide-cta:hover { background: #f2f2f2; transform: translateY(-2px) scale(1.02); }
+  .slide-cta:active { transform: scale(0.95); }
+
+  .ripple {
+    position: absolute;
+    width: 0; height: 0;
+    border-radius: 50%;
+    background: rgba(0,0,0,0.15);
+    pointer-events: none;
+    transform: translate(-50%, -50%);
+  }
+  .ripple.active {
+    animation: ripple-effect 0.6s ease-out forwards;
+  }
+  @keyframes ripple-effect {
+    0% { width: 0; height: 0; opacity: 1; }
+    100% { width: 300px; height: 300px; opacity: 0; }
+  }
 
   .coupon-chip {
     display: flex;
@@ -558,7 +649,6 @@
     font-family: monospace;
   }
 
-  /* Images */
   .slide-imgs {
     position: absolute;
     right: 0; top: 0; bottom: 0;
@@ -575,15 +665,18 @@
     animation: float 3.8s ease-in-out infinite;
     box-shadow: 0 12px 32px rgba(0,0,0,0.28);
   }
-  .slide-imgs img:nth-child(2) { animation-delay: 0.35s; }
-  .slide-imgs img:nth-child(3) { animation-delay: 0.7s; }
+  .slide-imgs img:nth-child(2) { animation-delay: 0.35s; animation-duration: 4.2s; }
+  .slide-imgs img:nth-child(3) { animation-delay: 0.7s; animation-duration: 3.4s; }
 
   @keyframes float {
-    0%, 100% { margin-bottom: 0; }
-    50% { margin-bottom: 7px; }
+    0%, 100% { transform: translateY(0) rotate(var(--float-rotate, 0deg)); }
+    50% { transform: translateY(-10px) rotate(var(--float-rotate, 0deg)); }
   }
 
-  /* Discount badge */
+  .slide-imgs img:nth-child(1) { --float-rotate: -1deg; }
+  .slide-imgs img:nth-child(2) { --float-rotate: 1deg; }
+  .slide-imgs img:nth-child(3) { --float-rotate: -0.5deg; }
+
   .disc-badge {
     position: absolute;
     top: 16px; right: 16px;
@@ -597,13 +690,29 @@
     justify-content: center;
     z-index: 10;
     gap: 0;
+    overflow: hidden;
   }
+  .disc-badge::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(255,255,255,0.3) 0%, transparent 50%);
+    animation: shimmer 3s ease-in-out infinite;
+  }
+  @keyframes shimmer {
+    0% { transform: translateX(-100%) rotate(25deg); }
+    20% { transform: translateX(100%) rotate(25deg); }
+    100% { transform: translateX(100%) rotate(25deg); }
+  }
+
   .badge-num {
     font-family: 'Syne', sans-serif;
     font-size: 13px;
     font-weight: 800;
     line-height: 1;
     letter-spacing: -0.02em;
+    position: relative;
+    z-index: 1;
   }
   .badge-off {
     font-size: 7px;
@@ -612,6 +721,8 @@
     opacity: 0.8;
     text-transform: uppercase;
     line-height: 1.2;
+    position: relative;
+    z-index: 1;
   }
 
   .tctext {
@@ -624,7 +735,6 @@
     z-index: 10;
   }
 
-  /* Progress nav bars */
   .slide-nav {
     position: absolute;
     bottom: 14px;
@@ -643,8 +753,11 @@
     padding: 0;
     border-radius: 2px;
     overflow: hidden;
-    transition: width 0.3s ease;
+    transition: width 0.3s ease, background 0.3s ease;
     position: relative;
+  }
+  .nav-bar:hover {
+    background: rgba(255,255,255,0.35);
   }
   .nav-bar.active {
     width: 52px;
@@ -661,21 +774,43 @@
     border-radius: 2px;
   }
   .nav-bar.active .nav-fill {
-    animation: fill-bar 4.5s linear forwards;
+    animation: fill-bar 5s linear forwards;
   }
   @keyframes fill-bar {
     from { transform: scaleX(0); }
     to { transform: scaleX(1); }
   }
 
-  /* ── RIGHT COLUMN ── */
+  .confetti-layer {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 50;
+    overflow: hidden;
+  }
+  .confetti-piece {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    background: var(--color);
+    border-radius: 2px;
+    left: var(--x);
+    top: var(--y);
+    transform: scale(var(--s)) rotate(var(--r));
+    animation: confetti-fall 1.2s ease-out var(--d) forwards;
+    opacity: 0;
+  }
+  @keyframes confetti-fall {
+    0% { opacity: 1; transform: scale(var(--s)) rotate(0deg) translateY(0); }
+    100% { opacity: 0; transform: scale(0) rotate(var(--r)) translateY(80px); }
+  }
+
   .right-col {
     display: flex;
     flex-direction: column;
     gap: 10px;
   }
 
-  /* MoMo Card */
   .momo-card {
     background: #ffcb05;
     border-radius: 24px;
@@ -687,6 +822,11 @@
     min-height: 150px;
     position: relative;
     overflow: hidden;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+  }
+  .momo-card:hover {
+    transform: translateY(-2px) scale(1.01);
+    box-shadow: 0 8px 24px rgba(255,203,5,0.3);
   }
   .momo-card::after {
     content: '';
@@ -696,6 +836,11 @@
     border: 28px solid rgba(0,0,0,0.05);
     border-radius: 50%;
     pointer-events: none;
+    animation: decor-spin 20s linear infinite;
+  }
+  @keyframes decor-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
   }
 
   .momo-header {
@@ -713,6 +858,11 @@
     background: #1a0e00;
     border-radius: 50%;
     opacity: 0.5;
+    animation: pulse-dot 2s ease-in-out infinite;
+  }
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 0.5; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.3); }
   }
   .momo-label {
     font-size: 9px;
@@ -766,15 +916,23 @@
     align-items: center;
     justify-content: center;
     gap: 6px;
-    transition: background 0.15s ease, color 0.15s ease;
+    transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease;
+    position: relative;
+    overflow: hidden;
   }
-  .momo-btn:hover { background: #2e1e00; }
+  .momo-btn:hover { background: #2e1e00; transform: translateY(-1px); }
+  .momo-btn:active { transform: scale(0.97); }
   .momo-btn.activated {
     background: #14532d;
     color: #fff;
+    animation: success-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  @keyframes success-pop {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
   }
 
-  /* Flash Strip */
   .flash-strip {
     background: #111;
     border-radius: 20px;
@@ -783,6 +941,10 @@
     align-items: center;
     justify-content: space-between;
     gap: 10px;
+    transition: transform 0.3s ease;
+  }
+  .flash-strip:hover {
+    transform: scale(1.01);
   }
 
   .flash-header {
@@ -860,7 +1022,6 @@
     margin: 0 1px;
   }
 
-  /* ── ACTIVITY BAR ── */
   .activity-bar {
     grid-column: 1 / -1;
     background: #f5f4f0;

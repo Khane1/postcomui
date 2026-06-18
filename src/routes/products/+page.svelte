@@ -4,7 +4,8 @@
     import { appState } from "$lib/state.svelte.js";
     import ProductCard from "$lib/components/ProductCard.svelte";
     import { products } from "$lib/data/products.js";
-let pricePercentage = $derived(((maxPrice - 9500) / (150000 - 9500)) * 100);
+    import ProductGrid from "$lib/components/ProductGrid.svelte";
+    let pricePercentage = $derived(((maxPrice - 9500) / (150000 - 9500)) * 100);
     // Svelte 5 Local Filter States
     let selectedCategories = $state([]); // Supports advanced multi-category selection
     let sortBy = $state("popular"); // "popular" | "price-asc" | "price-desc" | "rating"
@@ -70,7 +71,7 @@ let pricePercentage = $derived(((maxPrice - 9500) / (150000 - 9500)) * 100);
     });
 
     function handleProductRedirect(product) {
-        goto(`/${product.id}`);
+        appState.selectedProductForModal = product;
     }
 
     function handleFavoriteToggle(id) {
@@ -253,143 +254,176 @@ let pricePercentage = $derived(((maxPrice - 9500) / (150000 - 9500)) * 100);
                     </div>
                 {:else}
                     <div
-                        class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-3 xl:grid-cols-4 gap-4"
+                        class="flex gap-4 overflow-x-auto pb-4 scrollbar-none snap-x -mx-4 px-4 sm:mx-0 sm:px-0"
                     >
-                        {#each processedProducts as product (product.id)}
-                            <ProductCard
-                                {product}
-                                isFavorited={!!favoritedProducts[product.id]}
-                                onCardClick={handleProductRedirect}
+                        <!-- {#each processedProducts as product (product.id)}
+                            <div
+                                class="w-[200px] sm:w-[180px] shrink-0 snap-start"
+                            >
+                                <ProductCard
+                                    {product}
+                                    isFavorited={!!favoritedProducts[
+                                        product.id
+                                    ]}
+                                    onCardClick={handleProductRedirect}
+                                    onToggleFavorite={handleFavoriteToggle}
+                                    onAddToCart={handleAddToCart}
+                                />
+                            </div>
+                        {/each} -->
+                        <div id="catalog-grid-anchor" class="pt-4 scroll-mt-6">
+                            <ProductGrid
+                                products={processedProducts}
+                                favoritedMap={favoritedProducts}
+                                title="Explore All Sourced Products"
+                                onProductSelect={handleProductRedirect}
                                 onToggleFavorite={handleFavoriteToggle}
                                 onAddToCart={handleAddToCart}
+                                grid={true}
                             />
-                        {/each}
+                        </div>
                     </div>
                 {/if}
             </div>
         </div>
-       <aside
-  class="hidden lg:flex lg:col-span-3 bg-white border border-slate-200 rounded-3xl p-5 flex-col justify-between max-h-full space-y-6 select-none shadow-md"
->
-  <div class="space-y-6">
-    <div class="flex justify-between items-center border-b border-slate-200 pb-2">
-      <h3 class="text-xs font-black text-slate-900 uppercase tracking-widest">
-        Sourcing Filters
-      </h3>
-      <button
-        onclick={resetAllFilters}
-        class="text-[10px] font-bold text-red-600 hover:underline focus:outline-none"
-      >
-        Reset
-      </button>
-    </div>
-
-    <!-- Filter 1: Advanced Category Selection -->
-    <div class="space-y-2.5">
-      <span class="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
-        Categories
-      </span>
-      <div class="space-y-2">
-        {#each categoriesList as cat}
-          <button
-            onclick={() => toggleCategory(cat)}
-            class="flex items-center gap-2.5 text-xs font-bold text-slate-600 hover:text-slate-900 transition-all text-left focus:outline-none"
-          >
-            <div
-              class="w-4 h-4 border-2 rounded flex items-center justify-center transition-all
-                {selectedCategories.includes(cat) || appState.selectedCategory === cat
-                  ? 'border-red-600 bg-red-600 text-white'
-                  : 'border-slate-300 bg-white'}"
-            >
-              {#if selectedCategories.includes(cat) || appState.selectedCategory === cat}
-                <svg
-                  class="w-2.5 h-2.5"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="3.5"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    d="M5 13l4 4L19 7"
-                  />
-                </svg>
-              {/if}
-            </div>
-            <span>{cat}</span>
-          </button>
-        {/each}
-      </div>
-    </div>
-
-    <!-- Filter 2: Subsidized Pricing Drag Slider (Vibrant Completed Track) -->
-    <div class="space-y-3 border-t border-slate-200/60 pt-4">
-      <div class="flex justify-between items-baseline">
-        <span class="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
-          Price Limit
-        </span>
-        <span class="text-xs font-black text-slate-900">
-          {maxPrice.toLocaleString()} UGX
-        </span>
-      </div>
-      <div class="space-y-1">
-        <input
-          type="range"
-          min="9500"
-          max="150000"
-          step="500"
-          bind:value={maxPrice}
-          style="background: linear-gradient(to right, #dc2626 0%, #dc2626 {pricePercentage}%, #f1f5f9 {pricePercentage}%, #f1f5f9 100%);"
-          class="w-full h-1.5 rounded-lg appearance-none cursor-pointer accent-red-600 focus:outline-none"
-        />
-        <div class="flex justify-between text-[9px] text-slate-400 font-bold select-none">
-          <span>9,500 UGX</span>
-          <span>150,000 UGX</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Filter 3: Stock Checkbox -->
-    <div class="space-y-2 border-t border-slate-200/60 pt-4">
-      <span class="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
-        Availability
-      </span>
-      <button
-        onclick={() => (onlyInStock = !onlyInStock)}
-        class="flex items-center gap-2.5 text-xs font-bold text-slate-600 hover:text-slate-900 transition-all focus:outline-none"
-      >
-        <div
-          class="w-4 h-4 border-2 rounded flex items-center justify-center transition-all
-            {onlyInStock
-              ? 'border-red-600 bg-red-600 text-white'
-              : 'border-slate-300 bg-white'}"
+        <aside
+            class="hidden lg:flex lg:col-span-3 bg-white border border-slate-200 rounded-3xl p-5 flex-col justify-between max-h-full space-y-6 select-none shadow-md"
         >
-          {#if onlyInStock}
-            <svg
-              class="w-2.5 h-2.5"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="3.5"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                d="M5 13l4 4L19 7"
-              />
-            </svg>
-          {/if}
-        </div>
-        <span>Show In Stock Only</span>
-      </button>
-    </div>
-  </div>
+            <div class="space-y-6">
+                <div
+                    class="flex justify-between items-center border-b border-slate-200 pb-2"
+                >
+                    <h3
+                        class="text-xs font-black text-slate-900 uppercase tracking-widest"
+                    >
+                        Sourcing Filters
+                    </h3>
+                    <button
+                        onclick={resetAllFilters}
+                        class="text-[10px] font-bold text-red-600 hover:underline focus:outline-none"
+                    >
+                        Reset
+                    </button>
+                </div>
 
-  <div class="pt-4 border-t border-slate-200 text-[10px] text-slate-400 font-medium leading-relaxed">
-    Posta collection routing updates automatically as filters are set.
-  </div>
-</aside>
+                <!-- Filter 1: Advanced Category Selection -->
+                <div class="space-y-2.5">
+                    <span
+                        class="text-[10px] font-black text-slate-400 uppercase tracking-wider block"
+                    >
+                        Categories
+                    </span>
+                    <div class="space-y-2">
+                        {#each categoriesList as cat}
+                            <button
+                                onclick={() => toggleCategory(cat)}
+                                class="flex items-center gap-2.5 text-xs font-bold text-slate-600 hover:text-slate-900 transition-all text-left focus:outline-none"
+                            >
+                                <div
+                                    class="w-4 h-4 border-2 rounded flex items-center justify-center transition-all
+                {selectedCategories.includes(cat) ||
+                                    appState.selectedCategory === cat
+                                        ? 'border-red-600 bg-red-600 text-white'
+                                        : 'border-slate-300 bg-white'}"
+                                >
+                                    {#if selectedCategories.includes(cat) || appState.selectedCategory === cat}
+                                        <svg
+                                            class="w-2.5 h-2.5"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            stroke-width="3.5"
+                                            viewBox="0 0 24 24"
+                                        >
+                                            <path
+                                                stroke-linecap="round"
+                                                stroke-linejoin="round"
+                                                d="M5 13l4 4L19 7"
+                                            />
+                                        </svg>
+                                    {/if}
+                                </div>
+                                <span>{cat}</span>
+                            </button>
+                        {/each}
+                    </div>
+                </div>
+
+                <!-- Filter 2: Subsidized Pricing Drag Slider (Vibrant Completed Track) -->
+                <div class="space-y-3 border-t border-slate-200/60 pt-4">
+                    <div class="flex justify-between items-baseline">
+                        <span
+                            class="text-[10px] font-black text-slate-400 uppercase tracking-wider block"
+                        >
+                            Price Limit
+                        </span>
+                        <span class="text-xs font-black text-slate-900">
+                            {maxPrice.toLocaleString()} UGX
+                        </span>
+                    </div>
+                    <div class="space-y-1">
+                        <input
+                            type="range"
+                            min="9500"
+                            max="150000"
+                            step="500"
+                            bind:value={maxPrice}
+                            style="background: linear-gradient(to right, #dc2626 0%, #dc2626 {pricePercentage}%, #f1f5f9 {pricePercentage}%, #f1f5f9 100%);"
+                            class="w-full h-1.5 rounded-lg appearance-none cursor-pointer accent-red-600 focus:outline-none"
+                        />
+                        <div
+                            class="flex justify-between text-[9px] text-slate-400 font-bold select-none"
+                        >
+                            <span>9,500 UGX</span>
+                            <span>150,000 UGX</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Filter 3: Stock Checkbox -->
+                <div class="space-y-2 border-t border-slate-200/60 pt-4">
+                    <span
+                        class="text-[10px] font-black text-slate-400 uppercase tracking-wider block"
+                    >
+                        Availability
+                    </span>
+                    <button
+                        onclick={() => (onlyInStock = !onlyInStock)}
+                        class="flex items-center gap-2.5 text-xs font-bold text-slate-600 hover:text-slate-900 transition-all focus:outline-none"
+                    >
+                        <div
+                            class="w-4 h-4 border-2 rounded flex items-center justify-center transition-all
+            {onlyInStock
+                                ? 'border-red-600 bg-red-600 text-white'
+                                : 'border-slate-300 bg-white'}"
+                        >
+                            {#if onlyInStock}
+                                <svg
+                                    class="w-2.5 h-2.5"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    stroke-width="3.5"
+                                    viewBox="0 0 24 24"
+                                >
+                                    <path
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                        d="M5 13l4 4L19 7"
+                                    />
+                                </svg>
+                            {/if}
+                        </div>
+                        <span>Show In Stock Only</span>
+                    </button>
+                </div>
+            </div>
+
+            <div
+                class="pt-4 border-t border-slate-200 text-[10px] text-slate-400 font-medium leading-relaxed"
+            >
+                Posta collection routing updates automatically as filters are
+                set.
+            </div>
+        </aside>
     </div>
 </div>
 
