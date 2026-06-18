@@ -59,7 +59,8 @@ export const products = [
     process: "Cold-Pressed Centrifuged",
     description: "Raw, unpasteurized honey harvested wild from multi-floral forest canopies in Busoga. Completely free of additives, yielding a deep amber consistency with a complex, woody herbal sweetness.",
     images: [
-      "https://images.unsplash.com/photo-1587049352846-4a222e784d38?auto=format&fit=crop&q=80&w=600",
+      "https://malaikahoney.com/wp-content/uploads/2019/12/honey.png",
+      "https://worldofbees.shop/en/wp-content/uploads/2024/04/DELTA-BEES-500G-WORLD-OF-BEES-SHOP-KAMPALA.png",
       "https://images.unsplash.com/photo-1471193945509-9ad0617afabf?auto=format&fit=crop&q=80&w=600"
     ],
     placeholder: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'><rect width='100%' height='100%' fill='%23f1f5f9'/></svg>"
@@ -80,7 +81,7 @@ export const products = [
     process: "Mutuba Tree Beat-Sourcing",
     description: "Crafted using ancient UNESCO-recognized Mutuba barkcloth techniques. Reinforced with genuine Ugandan tan leather detailing to deliver a highly durable, structured, and culturally historical accessory.",
     images: [
-      "https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&q=80&w=600",
+      "https://ug.jumia.is/unsafe/fit-in/300x300/filters:fill(white)/product/81/7282052/1.jpg?2014",
       "https://images.unsplash.com/photo-1524498250077-390f9e378fc0?auto=format&fit=crop&q=80&w=600"
     ],
     placeholder: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'><rect width='100%' height='100%' fill='%23f1f5f9'/></svg>"
@@ -122,6 +123,7 @@ export const products = [
     process: "Cold-Pressed & Unrefined",
     description: "Our unrefined, unbleached Vitellaria nilotica shea butter is wild-harvested. Exceptionally soft and rich in essential fatty acids, it absorbs quickly to soothe dry skin and deeply nourish damaged hair.",
     images: [
+      "https://ug.jumia.is/unsafe/fit-in/300x300/filters:fill(white)/product/38/0207952/1.jpg?2596",
       "https://images.unsplash.com/photo-1608248597279-f99d160bfcbc?auto=format&fit=crop&q=80&w=600",
       "https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&q=80&w=600"
     ],
@@ -143,7 +145,7 @@ export const products = [
     process: "Salted & Raised Net-Dried",
     description: "Raised sun-dried silver cyprinid (locally known as Mukene) harvested sustainably from Lake Victoria. Processed on raised racks to avoid sand contamination, ensuring a clean, nutrient-dense ingredient.",
     images: [
-      "https://images.unsplash.com/photo-1534482421-64566f976cfa?auto=format&fit=crop&q=80&w=600",
+      "https://ug.jumia.is/unsafe/fit-in/680x680/filters:fill(white)/product/99/9259952/1.jpg?8282",
       "https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?auto=format&fit=crop&q=80&w=600"
     ],
     placeholder: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'><rect width='100%' height='100%' fill='%23f1f5f9'/></svg>"
@@ -164,7 +166,7 @@ export const products = [
     process: "Hand-coiled Organic Dyeing",
     description: "Woven by hand using robust local sisal stalks and soft raffia fibers. Coloured with natural root extracts, this multi-functional basket makes a highly structural and sustainable center or storage piece.",
     images: [
-      "https://images.unsplash.com/photo-1504198266287-1659872e6590?auto=format&fit=crop&q=80&w=600",
+      "https://edemastores.com/wp-content/uploads/2024/04/WhatsApp-Image-2024-04-03-at-10.35.23-PM.jpeg",
       "https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&q=80&w=600"
     ],
     placeholder: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'><rect width='100%' height='100%' fill='%23f1f5f9'/></svg>"
@@ -185,7 +187,7 @@ export const products = [
     process: "Natural Fermented & Roasted",
     description: "Finely ground from hand-sorted, naturally fermented cocoa beans cultivated on Rwenzori farms. Unsweetened, deeply dark, and highly aromatic—yielding an authentic, chocolatey profile.",
     images: [
-      "https://images.unsplash.com/photo-1587132137056-bfbf0166836e?auto=format&fit=crop&q=80&w=600",
+      "https://miu.ug/get-product-thumbnail/5043c50feac490f7ff579baf54a2821d.jpg",
       "https://images.unsplash.com/photo-1511381939415-e44015466834?auto=format&fit=crop&q=80&w=600"
     ],
     placeholder: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'><rect width='100%' height='100%' fill='%23f1f5f9'/></svg>"
@@ -206,7 +208,7 @@ export const products = [
     process: "Hand-shaped, Sanded & Polished",
     description: "Each cup is shaped and sanded by hand from ethically sourced, naturally patterned horns of the longhorn Ankole cattle. Features a unique, high-gloss natural woodgrain polish—completely unique in color and shape.",
     images: [
-      "https://images.unsplash.com/photo-1603006905003-be475563bc59?auto=format&fit=crop&q=80&w=600",
+      "https://www.alehorn.com/cdn/shop/products/shot-cup-drinking-horn-alehorn-viking-drinking-horn-vessels-and-accessories-1_1080x.webp.jpg?v=1696225629",
       "https://images.unsplash.com/photo-1576016770956-debb63d900ef?auto=format&fit=crop&q=80&w=600"
     ],
     placeholder: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'><rect width='100%' height='100%' fill='%23f1f5f9'/></svg>"
@@ -247,7 +249,7 @@ export const products = [
     process: "Solar Dehydrated",
     description: "Chewy, naturally sweet slices of local Kent and Keitt mangoes. Solar-dehydrated with zero added sugar, sulfur, or preservatives. A perfect high-energy snack.",
     images: [
-      "https://images.unsplash.com/photo-1601004890684-d8cbf643f5f2?w=600&q=80",
+      "https://m.media-amazon.com/images/I/61PvUlzEPzL.jpg",
       "https://images.unsplash.com/photo-1553530979-7ee52a2670c4?w=600&q=80"
     ],
     placeholder: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'><rect width='100%' height='100%' fill='%23f1f5f9'/></svg>"
@@ -268,7 +270,7 @@ export const products = [
     process: "Cold-Process Handcrafted",
     description: "Formulated with pure wild moringa leaf powder and organic neem oil. Deeply cleansing and soothing for sensitive or acne-prone skin, naturally antibacterial.",
     images: [
-      "https://images.unsplash.com/photo-1540555700478-4be289fbecef?w=600&q=80",
+      "https://images-cdn.ubuy.co.in/634e979b93555008d775a552-hawaiian-healing-skin-care.jpg",
       "https://images.unsplash.com/photo-1608248597279-f99d160bfcbc?w=600&q=80"
     ],
     placeholder: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'><rect width='100%' height='100%' fill='%23f1f5f9'/></svg>"
@@ -289,7 +291,7 @@ export const products = [
     process: "Natural Dried",
     description: "Fine robusta coffee known globally for its intense body and chocolate-malt undertones. Grown by sustainable smallholder farms in Kibinge.",
     images: [
-      "https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=600&q=80",
+      "https://firstcrackcoffee.me/cdn/shop/files/UgandaRobusta18Bag_533x.jpg?v=1778143718",
       "https://images.unsplash.com/photo-1447933601403-0c6688de566e?w=600&q=80"
     ],
     placeholder: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'><rect width='100%' height='100%' fill='%23f1f5f9'/></svg>"
@@ -331,7 +333,7 @@ export const products = [
     process: "Sought-After Bark Beat",
     description: "A premium cultural art panel crafted from beating Mutuba barkcloth. Hand-painted with deep natural charcoal pigments representing ancient Ganda motifs.",
     images: [
-      "https://images.unsplash.com/photo-1524498250077-390f9e378fc0?w=600&q=80",
+      "https://cdn.kastatic.org/ka-content-images/d4835562f6a3b397d34a660d3d2fe827afd4fdde.jpg",
       "https://images.unsplash.com/photo-1544816155-12df9643f363?w=600&q=80"
     ],
     placeholder: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'><rect width='100%' height='100%' fill='%23f1f5f9'/></svg>"
