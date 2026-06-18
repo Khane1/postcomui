@@ -16,6 +16,7 @@ export const products = [
     process: "Fully Washed",
     description: "Sourced directly from the volcanic slopes of Mount Elgon, this premium Arabica features a balanced, medium roast profile with prominent notes of stone fruit, brown sugar, and a crisp, clean citrus finish.",
     images: [
+      "https://colipsecoffee.com/cdn/shop/files/uganda-coffee-beans.jpg?v=1770364237&width=1946",
       "https://images.unsplash.com/photo-1559056199-641a0ac8b55e?auto=format&fit=crop&q=80&w=600",
       "https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?auto=format&fit=crop&q=80&w=600",
       "https://images.unsplash.com/photo-1447933601403-0c6688de566e?auto=format&fit=crop&q=80&w=600"
@@ -38,8 +39,7 @@ export const products = [
     process: "Sun-Dried & Stone-Ground",
     description: "A traditional blend of indigenous sweet cassava and finger millet. Rich in nutrients, stone-ground to preserve natural fibers, and perfect for preparing high-energy traditional meals.",
     images: [
-      "https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&q=80&w=600",
-      "https://images.unsplash.com/photo-1574362848149-11496d93a7c7?auto=format&fit=crop&q=80&w=600"
+      "https://horizonvertfoods.com/cdn/shop/files/farine-blan.png?v=1777493441"
     ],
     placeholder: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'><rect width='100%' height='100%' fill='%23f1f5f9'/></svg>"
   },
@@ -101,8 +101,8 @@ export const products = [
     process: "Sun-Cured & Aged",
     description: "Grown on the mist-covered foothills of the Rwenzori Mountains, these Grade A Bourbon vanilla pods are highly oily, plump, and deeply aromatic, rich in vanillin and ideal for high-end baking.",
     images: [
-      "https://images.unsplash.com/photo-1595122245594-a55086ee50a6?auto=format&fit=crop&q=80&w=600",
-      "https://images.unsplash.com/photo-1608248597279-f99d160bfcbc?auto=format&fit=crop&q=80&w=600"
+      "https://nativevanilla.com/cdn/shop/products/tahitian-vanilla-beans-grade-b-472885_720x.jpg?v=1668456977",
+      "https://sambavanilla.com/268-large_default/vanilla-beans-from-uganda.jpg",
     ],
     placeholder: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'><rect width='100%' height='100%' fill='%23f1f5f9'/></svg>"
   },
@@ -227,8 +227,7 @@ export const products = [
     process: "Harvest-to-Order",
     description: "Plump, premium green highland bananas (matooke) harvested at peak starch maturity. Rich, creamy texture when steamed, perfect for traditional Luwombo.",
     images: [
-      "https://images.unsplash.com/photo-1518843875459-f738682238a6?w=600&q=80",
-      "https://images.unsplash.com/photo-1528825871115-3581a5387919?w=600&q=80"
+      "https://www.africanfoodclub.shop/cdn/shop/files/09395A4E-291E-47BF-A321-FC89268F2BE0.jpg?v=1713597079&width=1946"
     ],
     placeholder: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'><rect width='100%' height='100%' fill='%23f1f5f9'/></svg>"
   },
@@ -311,8 +310,8 @@ export const products = [
     process: "Raised Net-Dried",
     description: "Screaming hot, deep-red bird's eye chilies grown organically on the foothills of the Rwenzori mountains. Hand-sorted and sun-dried.",
     images: [
-      "https://images.unsplash.com/photo-1588252393763-67989039115e?w=600&q=80",
-      "https://images.unsplash.com/photo-1518013002796-657ab50f56e9?w=600&q=80"
+      "https://sellerafrica.com/wp-content/uploads/2026/05/CHILLI-PEPPER-100G.jpeg",
+      "https://sellerafrica.com/wp-content/uploads/2026/05/cropped-asas-1-1.jpg"
     ],
     placeholder: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'><rect width='100%' height='100%' fill='%23f1f5f9'/></svg>"
   },

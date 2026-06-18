@@ -97,10 +97,10 @@
       class="flex justify-between items-baseline border-b border-slate-200/60 pb-2"
     >
       <div>
-        <h3 class="text-sm font-black text-slate-900 uppercase tracking-wider">
+        <h3 class="text- font-black text-slate-900 uppercase tracking-wider">
           Farm Fresh Produce
         </h3>
-        <p class="text-[10px] text-slate-500 font-medium">
+        <p class="text-[11px] text-slate-500 font-medium">
           Direct seasonal harvests from partner cooperatives
         </p>
       </div>

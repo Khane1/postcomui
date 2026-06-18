@@ -157,15 +157,15 @@
       
       <!-- Typographical Price Block (Matching Screenshot) -->
       <div class="flex items-start text-slate-900 leading-none py-0.5">
-        <span class="text-[9px] font-bold mt-0.5 mr-0.5">UGX</span>
+        <span class="text-[10px] font-bold mt-0.5 mr-0.5">UGX</span>
         <span class="text-lg font-extrabold tracking-tight">{priceParts.major}</span>
         {#if priceParts.minor}
-          <span class="text-[9px] font-bold mt-0.5">{priceParts.minor}</span>
+          <span class="text-[11px] font-bold mt-0.5">{priceParts.minor}</span>
         {/if}
       </div>
 
       <!-- Clean Instacart Sans-Serif Title -->
-      <h4 class="text-xs text-slate-700 font-medium line-clamp-2 leading-tight tracking-tight">
+      <h4 class="text- text-slate-700  line-clamp-2 leading-tight tracking-tight">
         {parsed.name}
       </h4>
 

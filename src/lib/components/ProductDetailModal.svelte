@@ -186,7 +186,7 @@
                   </svg>
                 </button>
                 {#if detailsExpanded}
-                  <div class="pb-4 text-xs text-slate-600 leading-relaxed font-medium animate-in fade-in duration-100">
+                  <div class="pb-4 text-sm text-slate-600 leading-relaxed  animate-in fade-in duration-100">
                     {product.description}
                   </div>
                 {/if}
@@ -204,10 +204,10 @@
                   </svg>
                 </button>
                 {#if returnsExpanded}
-                  <div class="pb-4 space-y-2 text-xs text-slate-600 animate-in fade-in duration-100">
-                    <div class="flex justify-between"><span class="text-slate-400 font-semibold">Origin</span><span class="text-slate-800 font-bold">{product.origin || 'Local Co-op'}</span></div>
-                    <div class="flex justify-between"><span class="text-slate-400 font-semibold">Altitude</span><span class="text-slate-800 font-bold">{product.altitude || 'Sustainable Sourced'}</span></div>
-                    <div class="flex justify-between"><span class="text-slate-400 font-semibold">Logistics Route</span><span class="text-slate-800 font-bold">ePosta Subsidized</span></div>
+                  <div class="pb-4 space-y-2 text-sm text-slate-600 animate-in fade-in duration-100">
+                    <div class="flex justify-between"><span class="text-slate-400 font-">Origin</span><span class="text-slate-800 font-bold">{product.origin || 'Local Co-op'}</span></div>
+                    <div class="flex justify-between"><span class="text-slate-400 font-">Altitude</span><span class="text-slate-800 font-bold">{product.altitude || 'Sustainable Sourced'}</span></div>
+                    <div class="flex justify-between"><span class="text-slate-400 font-">Logistics Route</span><span class="text-slate-800 font-bold">ePosta Subsidized</span></div>
                   </div>
                 {/if}
               </div>
