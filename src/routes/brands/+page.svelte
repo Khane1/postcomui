@@ -142,7 +142,7 @@
             <div>
                 <button
                     onclick={() => handleBrandSelect(brand)}
-                    class="bg-white sm:h-32 hover:border-slate-300 border border-slate-100 rounded-xl overflow-hidden flex flex-col transition-all hover:shadow-lg focus:outline-none group text-left cursor-pointer relative"
+                    class="bg-white sm:h-auto hover:border-slate-300 border border-slate-100 rounded-xl overflow-hidden flex flex-col transition-all hover:shadow-lg focus:outline-none group text-left cursor-pointer relative"
                 >
                     <!-- Panoramic Background Banner -->
                     <div
