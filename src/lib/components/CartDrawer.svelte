@@ -5,6 +5,7 @@
     import ProductCard from "./ProductCard.svelte";
     import { fly, fade } from "svelte/transition";
     import { cubicOut } from "svelte/easing";
+    import { goto } from "$app/navigation";
     let subtotal = $derived(
         appState.cartItems.reduce(
             (acc, item) => acc + item.product.price * item.quantity,
@@ -31,6 +32,7 @@
     function handleCheckoutTrigger() {
         appState.isCartOpen = false;
         appState.isCheckoutOpen = true; // Seamless modal overlay transition
+        goto('/cart')
     }
 
     function handleIncrement(item) {

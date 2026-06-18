@@ -273,7 +273,7 @@
             onclick={() => (isCheckoutOpen = true)}
             class="w-full bg-[#0aad0a] hover:bg-[#099409] text-white font-extrabold text-xs h-12 rounded-full transition-all shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-emerald-600"
           >
-            Place Subsidized Order
+            Place  Order
           </button>
         </div>
       </div>

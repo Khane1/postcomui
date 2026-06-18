@@ -72,7 +72,7 @@
         class="flex items-center gap-1 group focus:outline-none text-left"
       >
         <span
-          class="text-lg font-black text-black tracking-tight flex items-center gap-1.5"
+          class="text-lg font-black text-[#2b2b2b] tracking-tight flex items-center gap-1.5"
         >
           <img
             src="https://postcom.ug/assets/postcom-logo-white-B0oZfjq1.jpg"
