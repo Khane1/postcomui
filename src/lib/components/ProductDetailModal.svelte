@@ -3,6 +3,8 @@
   import { appState } from '$lib/state.svelte.js';
   import { products } from '$lib/data/products.js';
   import ProductCard from './ProductCard.svelte';
+  import { fly } from 'svelte/transition';
+  import { cubicOut } from 'svelte/easing';
 
   let product = $derived(appState.selectedProductForModal);
 
@@ -11,16 +13,28 @@
   let quantityInCart = $derived(cartEntry ? cartEntry.quantity : 0);
   let selectedThumbnailIndex = $state(0);
 
-  // Safely reset thumbnail pointer when switching selected products
+  // Element bindings for scroll control
+  let modalShell = $state();
+  let scrollContainer = $state();
+
+  function scrollToTop() {
+    // Reset internal container scrolls to top
+    if (modalShell) modalShell.scrollTop = 0;
+    if (scrollContainer) scrollContainer.scrollTop = 0;
+  }
+
+  // Safely reset thumbnail pointer & scroll when switching selected products
   $effect(() => {
     if (product) {
       selectedThumbnailIndex = 0;
+      scrollToTop(); // This ensures it scrolls to top automatically when a user clicks a suggestion
     }
   });
+
   // Accordion Expand States
   let detailsExpanded = $state(true);
   let returnsExpanded = $state(false);
-  let isFavorited=$state(false)
+  let isFavorited = $state(false);
 
   // Suggestions row ("Customers also considered")
   let suggestions = $derived(
@@ -72,15 +86,20 @@
   >
     <!-- Modal Shell (Mobile slides from bottom up, Desktop is a centered card) -->
     <div 
-      class="bg-white w-full rounded-t-3xl sm:rounded-3xl max-w-4xl sm:max-h-[90vh] h-[85vh] sm:h-auto overflow-y-auto flex flex-col justify-between shadow-2xl border border-slate-200/50 animate-in slide-in-from-bottom sm:zoom-in-95 duration-200"
+      bind:this={modalShell}
+      class="bg-white w-full rounded-t-3xl sm:rounded-3xl max-w-4xl sm:max-h-[90vh] h-[85vh] sm:h-auto overflow-y-auto flex flex-col justify-between shadow-2xl border border-slate-200/50"
       onclick={(e) => e.stopPropagation()}
       role="none"
+      transition:fly={{ y: 440, duration: 300, easing: cubicOut }}
     >
       <!-- Mobile Pull Tab -->
       <div class="sm:hidden w-12 h-1 bg-slate-300 rounded-full mx-auto my-3 shrink-0"></div>
 
       <!-- Scrollable Container -->
-      <div class="p-5 sm:p-8 space-y-8 overflow-y-auto flex-1">
+      <div 
+        bind:this={scrollContainer}
+        class="p-5 sm:p-8 space-y-8 overflow-y-auto flex-1"
+      >
         
         <!-- Header Controls -->
         <div class="flex items-center justify-between">
@@ -130,7 +149,6 @@
               </div>
 
               <!-- Main Centered Image Display -->
-              <!-- Active Main Image Viewport (Flush edge-to-edge cover layout) -->
               <div class="flex-1 aspect-square bg-slate-50/45 border border-slate-200/40 rounded-3xl relative overflow-hidden">
                 <img 
                   src={product.images[selectedThumbnailIndex]} 
@@ -143,9 +161,6 @@
                     {product.badge}
                   </span>
                 {/if}
-
-                <!-- Magnifier Icon Overlay -->
-
               </div>
             </div>
 
@@ -162,9 +177,8 @@
               <h2 class="text-lg sm:text-2xl font-black text-slate-900 leading-tight tracking-tight">{product.name}</h2>
               <p class="text-xs text-slate-400 font-bold">{product.size}</p>
               
-              <!-- Underlined cooperative link -->
               <button 
-                onclick={() => { appState.selectedCategory = product.category; close(); goto('/products'); }}
+                onclick={() => { appState.selectedCategory = product.category; close(); }}
                 class="text-xs font-bold text-emerald-600 hover:text-emerald-700 hover:underline cursor-pointer focus:outline-none block pt-1"
               >
                 Shop all {product.seller}
@@ -186,7 +200,7 @@
                   </svg>
                 </button>
                 {#if detailsExpanded}
-                  <div class="pb-4 text-sm text-slate-600 leading-relaxed  animate-in fade-in duration-100">
+                  <div class="pb-4 text-sm text-slate-600 leading-relaxed animate-in fade-in duration-100">
                     {product.description}
                   </div>
                 {/if}
@@ -205,9 +219,9 @@
                 </button>
                 {#if returnsExpanded}
                   <div class="pb-4 space-y-2 text-sm text-slate-600 animate-in fade-in duration-100">
-                    <div class="flex justify-between"><span class="text-slate-400 font-">Origin</span><span class="text-slate-800 font-bold">{product.origin || 'Local Co-op'}</span></div>
-                    <div class="flex justify-between"><span class="text-slate-400 font-">Altitude</span><span class="text-slate-800 font-bold">{product.altitude || 'Sustainable Sourced'}</span></div>
-                    <div class="flex justify-between"><span class="text-slate-400 font-">Logistics Route</span><span class="text-slate-800 font-bold">ePosta Subsidized</span></div>
+                    <div class="flex justify-between"><span class="text-slate-400">Origin</span><span class="text-slate-800 font-bold">{product.origin || 'Local Co-op'}</span></div>
+                    <div class="flex justify-between"><span class="text-slate-400">Altitude</span><span class="text-slate-800 font-bold">{product.altitude || 'Sustainable Sourced'}</span></div>
+                    <div class="flex justify-between"><span class="text-slate-400">Logistics Route</span><span class="text-slate-800 font-bold">ePosta Subsidized</span></div>
                   </div>
                 {/if}
               </div>
@@ -219,7 +233,6 @@
           <div class="md:col-span-5 h-fit select-none">
             <div class="border border-slate-200 rounded-2xl p-5 shadow-xs bg-white space-y-4 relative">
               
-              <!-- Clean Superscript Price format -->
               <div class="flex items-start text-slate-900 leading-none">
                 <span class="text-xs font-bold mt-1 mr-0.5">UGX</span>
                 <span class="text-2xl font-black tracking-tight">{priceParts.major}</span>
@@ -228,14 +241,12 @@
                 {/if}
               </div>
 
-              <!-- Promo Tag (Matching Coupon Tag) -->
               <div class="flex">
                 <span class="bg-orange-500 text-white text-[10px] font-black uppercase px-2 py-1 rounded-xl flex items-center gap-1 select-none">
                   🏷️ Save 1,500 UGX with MoMo
                 </span>
               </div>
 
-              <!-- Wide Quantity Dropdown Selector (Matching Dropdown Menu) -->
               <div class="relative">
                 <label for="quantity-selector" class="sr-only">Quantity</label>
                 <select 
@@ -260,7 +271,6 @@
                 </div>
               </div>
 
-              <!-- Large Green Full-Width Add To Cart Button -->
               <button 
                 onclick={handleIncrement}
                 class="w-full bg-[#0aad0a] hover:bg-[#099409] text-white font-extrabold text-sm h-12 rounded-full transition-all focus:outline-none cursor-pointer flex items-center justify-center gap-1.5 shadow-xs"
@@ -268,9 +278,8 @@
                 <span>Add to cart</span>
               </button>
 
-              <!-- Save / Bookmark Button -->
               <button 
-                onclick={() => onToggleFavorite?.(product.id)}
+                onclick={() => isFavorited = !isFavorited}
                 class="w-full border border-slate-200 hover:border-slate-300 text-slate-700 hover:text-slate-900 font-bold text-xs h-10 rounded-full transition-all focus:outline-none flex items-center justify-center gap-2 bg-white"
               >
                 <svg class="w-4 h-4 {isFavorited ? 'fill-red-500 stroke-red-500' : 'stroke-slate-500'}" fill="none" stroke-width="2.5" viewBox="0 0 24 24">
@@ -290,7 +299,13 @@
             <div class="flex gap-4 overflow-x-auto pb-2 scrollbar-none snap-x -mx-4 px-4 sm:mx-0 sm:px-0">
               {#each suggestions as sug}
                 <div class="w-36 shrink-0 snap-start">
-                  <ProductCard product={sug} onCardClick={() => appState.selectedProductForModal = sug} />
+                  <ProductCard 
+                    product={sug} 
+                    onCardClick={() => { 
+                      appState.selectedProductForModal = sug; 
+                      scrollToTop(); 
+                    }} 
+                  />
                 </div>
               {/each}
             </div>
@@ -307,9 +322,8 @@
           <span class="text-xl select-none">🚜</span>
         </div>
 
-        <!-- 3. Details Accordion -->
+        <!-- 3. Sourcing Details -->
         <div class="border-t border-slate-100 pt-1">
-          <!-- Accordion Title -->
           <button 
             onclick={() => detailsExpanded = !detailsExpanded}
             class="w-full flex items-center justify-between py-3.5 focus:outline-none text-left"
@@ -331,7 +345,7 @@
           {/if}
         </div>
 
-        <!-- 4. Reviews Block (Coming Last) -->
+        <!-- 4. Reviews Block -->
         <div class="border-t border-slate-100 pt-4 space-y-3">
           <h4 class="text-xs font-black text-slate-400 uppercase tracking-widest select-none">Reviews ({product.reviews})</h4>
           <div class="space-y-3">
