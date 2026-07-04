@@ -1,8 +1,7 @@
-<!-- lib/components/CheckoutModal.svelte -->
 <script>
   import { appState } from '$lib/state.svelte.js';
 
-  let checkoutStep = $state(1); // 1: Sign-In, 2: Location, 3: Payment, 4: Success
+  let checkoutStep = $state(1); 
   let phone = $state("");
   let otpCode = $state("");
   let isOtpSent = $state(false);
@@ -28,21 +27,40 @@
     otpCode = "";
   }
 
-  function triggerOtp() {
+  async function triggerOtp() {
     if (!phone) return;
+    await appState.triggerOtp(phone);
     isOtpSent = true;
   }
 
-  function verifyOtp() {
-    if (otpCode.length === 4) checkoutStep = 2;
+  async function verifyOtp() {
+    if (otpCode.length === 4) {
+      const verified = await appState.verifyOtp(phone, otpCode);
+      if (verified) {
+        checkoutStep = 2;
+      }
+    }
   }
 
   function confirmLocation() {
     checkoutStep = 3;
   }
 
-  function processOrder() {
-    trackingId = `UG-POSTA-${Math.floor(100000 + Math.random() * 900000)}`;
+  async function processOrder() {
+    const payload = {
+      items: appState.cartItems.map(item => ({
+        productId: item.product.id,
+        quantity: item.quantity,
+        fulfillment: item.fulfillment
+      })),
+      phone,
+      address: deliveryAddress,
+      branch: appState.activeBranch,
+      paymentMethod: paymentProvider,
+      paymentPhone
+    };
+    const res = await appState.submitOrder(payload);
+    trackingId = res.trackingId;
     checkoutStep = 4;
   }
 
@@ -60,7 +78,6 @@
   <div class="fixed inset-0 z-[100] bg-slate-950/40 backdrop-blur-xs flex items-center justify-center p-4">
     <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200/50 relative animate-in zoom-in-95 duration-200">
       
-      <!-- Stepped Header Indicator -->
       {#if checkoutStep < 4}
         <div class="flex items-center justify-between mb-6 border-b border-slate-100 pb-4 select-none text-[10px] font-black uppercase tracking-wider text-slate-400">
           <span>Checkout step {checkoutStep} of 3</span>
@@ -70,57 +87,41 @@
         </div>
       {/if}
 
-      <!-- STEP 1: SIGN-IN -->
       {#if checkoutStep === 1}
         <div class="space-y-4">
           <div class="space-y-1">
             <h3 class="text-sm font-black text-slate-900 uppercase tracking-wider">Secure Phone Sign-In</h3>
-            <p class="text-xs text-slate-500 leading-relaxed font-medium">Verify your phone number with a secure One-Time PIN. No passwords required.</p>
+            <p class="text-xs text-slate-500 leading-relaxed font-medium">Verify your phone number with a secure One-Time PIN.</p>
           </div>
 
           <div class="space-y-3">
             <div>
               <label for="modal-phone" class="text-[10px] font-black uppercase tracking-wider text-slate-400 block mb-1">Mobile Phone Number</label>
               <div class="relative">
-                <input 
-                  id="modal-phone"
-                  type="tel" 
-                  placeholder="e.g. +256 772 123456" 
-                  bind:value={phone}
-                  disabled={isOtpSent}
-                  class="w-full pl-12 pr-4 py-2.5 bg-slate-50 border border-slate-200 focus:border-slate-400 rounded-xl text-xs font-bold focus:outline-none"
-                />
-                <span class="absolute left-4 top-3 text-xs font-extrabold text-slate-400 select-none">🇺🇬</span>
+                <input id="modal-phone" type="tel" placeholder="e.g. +256 772 123456" bind:value={phone} disabled={isOtpSent} class="w-full pl-12 pr-4 py-2.5 bg-slate-50 border border-slate-200 focus:border-slate-400 rounded-xl text-xs font-bold focus:outline-none"/>
+                <span class="absolute left-4 top-3 text-xs font-extrabold text-slate-400">🇺🇬</span>
               </div>
             </div>
 
             {#if isOtpSent}
               <div class="space-y-1.5 animate-in fade-in duration-200">
                 <label for="modal-otp" class="text-[10px] font-black uppercase tracking-wider text-slate-400 block">Verification PIN (SMS)</label>
-                <input 
-                  id="modal-otp"
-                  type="text" 
-                  maxlength="4" 
-                  placeholder="Enter 4-digit code" 
-                  bind:value={otpCode}
-                  oninput={verifyOtp}
-                  class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 focus:border-slate-400 rounded-xl text-xs font-bold tracking-[0.25em] text-center focus:outline-none"
-                />
+                <input id="modal-otp" type="text" maxlength="4" placeholder="Enter 4-digit code" bind:value={otpCode} oninput={verifyOtp} class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 focus:border-slate-400 rounded-xl text-xs font-bold tracking-[0.25em] text-center focus:outline-none"/>
               </div>
             {/if}
           </div>
 
           <div class="pt-2">
             {#if !isOtpSent}
-              <button onclick={triggerOtp} disabled={!phone} class="w-full bg-slate-900 hover:bg-slate-800 disabled:bg-slate-200 text-white font-bold text-xs py-3 rounded-xl transition-all focus:outline-none">
+              <button onclick={triggerOtp} disabled={!phone} class="w-full bg-[#0aad0a] hover:bg-[#099409] disabled:bg-slate-200 text-white font-bold text-xs py-3 rounded-xl transition-all focus:outline-none">
                 Send Verification PIN
               </button>
             {/if}
           </div>
         </div>
+      {/if}
 
-      <!-- STEP 2: LOCATION -->
-      {:else if checkoutStep === 2}
+      {#if checkoutStep === 2}
         <div class="space-y-4">
           <div class="space-y-1">
             <h3 class="text-sm font-black text-slate-900 uppercase tracking-wider">Confirm Fulfillment Location</h3>
@@ -130,17 +131,11 @@
           {#if hasDelivery}
             <div class="space-y-2">
               <label for="modal-address" class="text-[10px] font-black uppercase tracking-wider text-slate-400 block">Delivery Address Details</label>
-              <textarea 
-                id="modal-address"
-                rows="3" 
-                placeholder="District, Village, Street Name, House Number or Landmarking cues..." 
-                bind:value={deliveryAddress}
-                class="w-full p-4 bg-slate-50 border border-slate-200 focus:border-slate-400 rounded-xl text-xs font-semibold focus:outline-none resize-none leading-relaxed"
-              ></textarea>
+              <textarea id="modal-address" rows="3" placeholder="District, Village, Street Name..." bind:value={deliveryAddress} class="w-full p-4 bg-slate-50 border border-slate-200 focus:border-slate-400 rounded-xl text-xs font-semibold focus:outline-none resize-none leading-relaxed"></textarea>
             </div>
           {:else}
             <div class="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-1 text-xs">
-              <p class="text-[9px] font-black tracking-wider text-slate-400 uppercase select-none">Selected Posta Branch</p>
+              <p class="text-[9px] font-black tracking-wider text-slate-400 uppercase">Selected Posta Branch</p>
               <p class="font-bold text-slate-900">{appState.activeBranch}</p>
               <p class="text-[11px] text-slate-500 leading-relaxed pt-1 font-medium">Your package will be held securely here. You'll receive an SMS arrival alert.</p>
             </div>
@@ -150,25 +145,25 @@
             Continue to Payment
           </button>
         </div>
+      {/if}
 
-      <!-- STEP 3: PAYMENT -->
-      {:else if checkoutStep === 3}
+      {#if checkoutStep === 3}
         <div class="space-y-4">
           <div class="space-y-1">
             <h3 class="text-sm font-black text-slate-900 uppercase tracking-wider">Subsidized Payment Routing</h3>
-            <p class="text-xs text-slate-500 leading-relaxed font-medium">Select a payment provider. Secure transaction routed instantly.</p>
+            <p class="text-xs text-slate-500 leading-relaxed font-medium">Select a payment provider.</p>
           </div>
 
           <div class="grid grid-cols-3 gap-2.5 select-none">
-            <button onclick={() => paymentProvider = "mtn"} class="border-2 p-3 rounded-2xl flex flex-col items-center justify-between h-20 transition-all focus:outline-none {paymentProvider === 'mtn' ? 'border-amber-400 bg-amber-50/50' : 'border-slate-200 bg-white'}">
+            <button onclick={() => (paymentProvider = "mtn")} class="border-2 p-3 rounded-2xl flex flex-col items-center justify-between h-20 transition-all focus:outline-none {paymentProvider === 'mtn' ? 'border-amber-400 bg-amber-50/50' : 'border-slate-200 bg-white'}">
               <span class="w-5 h-5 bg-amber-400 rounded-full flex items-center justify-center text-[10px] font-black text-slate-950">M</span>
               <span class="text-[9px] font-black text-slate-800 uppercase">MTN MoMo</span>
             </button>
-            <button onclick={() => paymentProvider = "airtel"} class="border-2 p-3 rounded-2xl flex flex-col items-center justify-between h-20 transition-all focus:outline-none {paymentProvider === 'airtel' ? 'border-red-600 bg-red-50/50' : 'border-slate-200 bg-white'}">
+            <button onclick={() => (paymentProvider = "airtel")} class="border-2 p-3 rounded-2xl flex flex-col items-center justify-between h-20 transition-all focus:outline-none {paymentProvider === 'airtel' ? 'border-red-600 bg-red-50/50' : 'border-slate-200 bg-white'}">
               <span class="w-5 h-5 bg-red-600 rounded-full flex items-center justify-center text-[10px] font-black text-white">A</span>
               <span class="text-[9px] font-black text-slate-800 uppercase">Airtel</span>
             </button>
-            <button onclick={() => paymentProvider = "counter"} class="border-2 p-3 rounded-2xl flex flex-col items-center justify-between h-20 transition-all focus:outline-none {paymentProvider === 'counter' ? 'border-slate-950 bg-slate-50' : 'border-slate-200 bg-white'}">
+            <button onclick={() => (paymentProvider = "counter")} class="border-2 p-3 rounded-2xl flex flex-col items-center justify-between h-20 transition-all focus:outline-none {paymentProvider === 'counter' ? 'border-slate-950 bg-slate-50' : 'border-slate-200 bg-white'}">
               <span class="w-5 h-5 bg-slate-900 rounded-full flex items-center justify-center text-[10px] font-black text-white">P</span>
               <span class="text-[9px] font-black text-slate-800 uppercase">Branch Pay</span>
             </button>
@@ -179,18 +174,18 @@
               <label for="modal-pay-phone" class="text-[10px] font-black uppercase tracking-wider text-slate-400 block">Mobile Wallet Phone</label>
               <div class="relative">
                 <input id="modal-pay-phone" type="tel" placeholder="e.g. +256 772 123456" bind:value={paymentPhone} class="w-full pl-12 pr-4 py-2.5 bg-slate-50 border border-slate-200 focus:border-slate-400 rounded-xl text-xs font-bold focus:outline-none" />
-                <span class="absolute left-4 top-3 text-xs font-extrabold text-slate-400 select-none">🇺🇬</span>
+                <span class="absolute left-4 top-3 text-xs font-extrabold text-slate-400">🇺🇬</span>
               </div>
             </div>
           {/if}
 
-          <button onclick={processOrder} disabled={paymentProvider !== "counter" && !paymentPhone} class="w-full bg-slate-900 hover:bg-slate-800 disabled:bg-slate-200 text-white font-bold text-xs py-3 rounded-xl transition-all focus:outline-none">
+          <button onclick={processOrder} disabled={paymentProvider !== "counter" && !paymentPhone} class="w-full bg-[#0aad0a] hover:bg-[#099409] disabled:bg-slate-200 text-white font-bold text-xs py-3 rounded-xl transition-all focus:outline-none">
             {paymentProvider === "counter" ? "Confirm Reservation" : "Trigger USSD Payment Prompt"}
           </button>
         </div>
+      {/if}
 
-      <!-- STEP 4: SUCCESS -->
-      {:else}
+      {#if checkoutStep === 4}
         <div class="space-y-5 text-center py-4 select-none">
           <div class="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto shadow-sm border border-emerald-100">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24">
@@ -214,7 +209,6 @@
         </div>
       {/if}
 
-      <!-- Close popup modal trigger -->
       {#if checkoutStep < 4}
         <button onclick={close} class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 focus:outline-none">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">

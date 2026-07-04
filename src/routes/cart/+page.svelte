@@ -1,634 +1,1006 @@
-<!-- src/routes/cart/+page.svelte -->
+<!-- routes/cart/+page.svelte -->
 <script>
+  import { onMount } from "svelte";
+  import { goto } from "$app/navigation";
+  import CartProductCard from "$lib/components/cards&grids/cartProductCard.svelte";
   import { appState } from "$lib/state.svelte.js";
+  import { stations } from "$lib/utils/stations.js";
 
-  // Checkout Wizard States
-  let isCheckoutOpen = $state(false);
-  let checkoutStep = $state(1); // 1: Sign-In, 2: Location, 3: Payment, 4: Success
-
-  // Form Field States
-  let phone = $state("");
-  let otpCode = $state("");
-  let isOtpSent = $state(false);
-  let deliveryAddress = $state("");
-  let paymentProvider = $state("mtn"); // "mtn", "airtel", "counter"
-  let paymentPhone = $state("");
   let trackingId = $state("");
+  let shippingFee = $state(0);
 
-  // Dynamic order calculations
+  // Status Check & Polling states
+  let isCheckingStatus = $state(false);
+  let currentOrderStatus = $state("PENDING_CONFIRMATION");
+
+  // Form payment routing states
+  let paymentType = $state("momo"); // momo or card
+  let paymentProvider = $state("mtn"); // mtn or airtel
+  let phoneNumberInput = $state("");
+
+  let cardNo = $state("");
+  let cardExpiry = $state("");
+  let cardCvv = $state("");
+
   let subtotal = $derived(
-    appState.cartItems.reduce(
-      (acc, item) => acc + item.product.price * item.quantity,
-      0,
-    ),
+    appState.cartItems.reduce((acc, item) => {
+      const price = Number(item?.product?.price || 0);
+      const qty = Number(item?.quantity || 0);
+      return acc + price * qty;
+    }, 0),
   );
 
   let hasDelivery = $derived(
     appState.cartItems.some((item) => item.fulfillment === "delivery"),
   );
-  let shippingFee = $derived(hasDelivery ? 5500 : 0);
+
   let total = $derived(subtotal + shippingFee);
 
-  function adjustQuantity(item, adjustment) {
-    if (adjustment ==1) {
-      item.quantity = Math.max(1, item.quantity + adjustment);
-    } else if (item.quantity == 1&&adjustment==-1) {
+  // Safely strips empty strings, non-UUID labels, or unresolved properties
+  function sanitizeUuid(val) {
+    if (!val) return null;
+    const s = String(val).trim();
+    if (
+      s === "" ||
+      s.toLowerCase() === "null" ||
+      s.toLowerCase() === "undefined"
+    ) {
+      return null;
+    }
+    // Filter out human-readable labels (like "Kampala GPO")
+    if (s.includes(" ") || (s.match(/[A-Z]/) && !s.match(/[a-f]/i))) {
+      return null;
+    }
+    return s;
+  }
 
-      appState.cartItems = appState.cartItems.filter(
-        (i) => i.product.id !== item.product.id,
+  onMount(async () => {
+    appState.fetchPaymentMethods();
+    appState.fetchCustomerAddresses();
+    appState.fetchPickupCenters();
+
+    // Populate profile phone coordinates
+    const user = await appState.getCurrentUser();
+    if (user && user.phone_number) {
+      phoneNumberInput = user.phone_number;
+    }
+  });
+
+  $effect(() => {
+    if (appState.customerAddresses.length > 0 && !appState.selectedAddressId) {
+      const defaultAddr =
+        appState.customerAddresses.find((a) => a.is_default) ||
+        appState.customerAddresses[0];
+      appState.selectedAddressId = defaultAddr.id;
+      appState.activeBranch = defaultAddr.street || defaultAddr.line1;
+    }
+  });
+
+  // Calculate fees safely - only polling once UUIDs are resolved
+  $effect(() => {
+    async function calculateFee() {
+      if (appState.cartItems.length === 0) {
+        shippingFee = 0;
+        return;
+      }
+
+      const totalGrams = appState.cartItems.reduce((acc, item) => {
+        const wt = Number(item.product.weight || 500);
+        return acc + wt * item.quantity;
+      }, 0);
+      const packageWeightKg = Math.max(0.5, totalGrams / 1000);
+
+      const activeCenter = appState.allPickUpCenters.find(
+        (c) =>
+          c.name === appState.activeBranch ||
+          String(c.id) === String(appState.activeBranch),
       );
-    }else {
-      item.quantity = Math.max(1, item.quantity + adjustment);
+
+      const cleanAddrId = hasDelivery
+        ? sanitizeUuid(appState.selectedAddressId)
+        : null;
+      const cleanCenterId = !hasDelivery
+        ? sanitizeUuid(activeCenter?.id)
+        : null;
+
+      // Defensive check: Do not execute network requests until critical UUID parameters resolve
+      if (hasDelivery && !cleanAddrId) {
+        shippingFee = 5500; // Static fallback
+        return;
+      }
+      if (!hasDelivery && !cleanCenterId) {
+        shippingFee = 0; // Free pickup fallback
+        return;
+      }
+
+      const payload = {
+        delivery_method: hasDelivery ? "DOOR_DELIVERY" : "PICKUP_STATION",
+        package_weight: packageWeightKg,
+        delivery_address_id: cleanAddrId,
+        pickup_center_id: cleanCenterId,
+        shipping_destination_id: null,
+      };
+
+      const fee = await appState.getDeliveryFee(payload);
+      shippingFee = fee;
+    }
+    calculateFee();
+  });
+
+  function adjustQuantity(item, adjustment) {
+    if (adjustment === 1) {
+      appState.addCartItem(item.product, 1);
+    } else {
+      appState.removeCartItem(item.product);
     }
   }
 
-  function removeItem(itemId) {
-    appState.cartItems = appState.cartItems.filter(
-      (i) => i.product.id !== itemId,
+  function startStatusPolling(orderId) {
+    let pollCount = 0;
+    const maxPolls = 30;
+
+    const interval = setInterval(async () => {
+      pollCount++;
+
+      if (pollCount > maxPolls) {
+        clearInterval(interval);
+        appState.addToast("Payment verification timeout.", "info");
+        isCheckingStatus = false;
+        goto("/account/myorders");
+        return;
+      }
+
+      if (orderId) {
+        const orderRes = await appState.getOrderStatus(orderId);
+        if (orderRes && orderRes.success) {
+          const status = (orderRes.status || "").toUpperCase();
+          currentOrderStatus = status;
+
+          if (
+            ["CONFIRMED", "SUCCESSFUL", "RECEIVED", "COMPLETED"].includes(
+              status,
+            )
+          ) {
+            clearInterval(interval);
+            appState.addToast("Payment Confirmed! Order complete.", "success");
+            setTimeout(() => {
+              isCheckingStatus = false;
+              goto("/account/myorders");
+            }, 1500);
+          } else if (
+            ["FAILED_PAYMENT", "FAILED", "CANCELLED"].includes(status)
+          ) {
+            clearInterval(interval);
+            appState.addToast("Transaction did not clear.", "error");
+            isCheckingStatus = false;
+            goto("/account/myorders");
+          }
+        }
+      } else {
+        if (pollCount === 2) {
+          currentOrderStatus = "PROCESSING_PAYMENT";
+        } else if (pollCount === 4) {
+          clearInterval(interval);
+          appState.addToast("Mock checkout confirmed.", "success");
+          setTimeout(() => {
+            isCheckingStatus = false;
+            goto("/account/myorders");
+          }, 1500);
+        }
+      }
+    }, 2000);
+  }
+
+  async function processOrder() {
+    const matchedPayment = appState.availablePaymentMethods.find((m) => {
+      const nameLower = (m.name || "").toLowerCase();
+      if (paymentType === "card") {
+        return (
+          nameLower.includes("card") ||
+          nameLower.includes("visa") ||
+          nameLower.includes("mastercard")
+        );
+      }
+      return paymentProvider === "mtn"
+        ? nameLower.includes("mtn") || nameLower.includes("momo")
+        : nameLower.includes("airtel");
+    });
+
+    const activeCenter = appState.allPickUpCenters.find(
+      (c) =>
+        c.name === appState.activeBranch ||
+        String(c.id) === String(appState.activeBranch),
     );
-  }
 
-  function triggerOtp() {
-    if (!phone) return;
-    isOtpSent = true;
-  }
+    const selectedAddress = appState.customerAddresses.find(
+      (a) => String(a.id) === String(appState.selectedAddressId),
+    );
 
-  function verifyOtp() {
-    if (otpCode.length === 4) {
-      checkoutStep = 2;
+    const cleanAddrId = hasDelivery
+      ? sanitizeUuid(appState.selectedAddressId)
+      : null;
+    const cleanCenterId = !hasDelivery ? sanitizeUuid(activeCenter?.id) : null;
+
+    // Validation guard: Rejects click if UUID values have not completed loading
+    if (hasDelivery && !cleanAddrId) {
+      appState.addToast(
+        "Please select or add a delivery address to complete your order.",
+        "error",
+      );
+      return;
+    }
+    if (!hasDelivery && !cleanCenterId) {
+      appState.addToast(
+        "Retrieving pickup center parameters. Please wait a moment...",
+        "info",
+      );
+      return;
+    }
+
+    const notesDetail = `Checked out via pay form. ${paymentType === "momo" ? "MoMo: " + phoneNumberInput : "Card"}.${!hasDelivery ? " Selected Pickup Station: " + appState.activeBranch : ""}`;
+
+    const payload = {
+      delivery_address_id: cleanAddrId,
+      pickup_center_id: cleanCenterId,
+      delivery_method: hasDelivery ? "DOOR_DELIVERY" : "PICKUP_STATION",
+      shipping_destination_id: null,
+      shipping_destination: "",
+      shipping_receiver_name: appState.user
+        ? `${appState.user.first_name || ""} ${appState.user.last_name || ""}`.trim()
+        : "Postal Customer",
+      shipping_receiver_address: selectedAddress
+        ? selectedAddress.street || selectedAddress.line1 || ""
+        : "",
+      shipping_receiver_phone_number:
+        phoneNumberInput || appState.user?.phone_number || "",
+      shipping_receiver_city: selectedAddress
+        ? selectedAddress.city || "Kampala"
+        : "Kampala",
+      shipping_receiver_state: selectedAddress
+        ? selectedAddress.state || selectedAddress.city || "Central"
+        : "Central",
+      shipping_receiver_zip_code: selectedAddress
+        ? selectedAddress.zip_code || "00000"
+        : "00000",
+      notes: notesDetail,
+    };
+
+    try {
+      isCheckingStatus = true;
+      currentOrderStatus = "PENDING_CONFIRMATION";
+      const orderRes = await appState.submitOrder(payload);
+      const orderId = orderRes?.id;
+      trackingId =
+        orderRes?.reference ||
+        orderId ||
+        `UG-POSTA-${Math.floor(100000 + Math.random() * 900000)}`;
+
+      if (orderId && matchedPayment?.id) {
+        const finalAmount = Math.max(0, total);
+
+        try {
+          if (paymentType === "momo") {
+            let order = await appState.addOrderPayment(
+              orderId,
+              finalAmount,
+              matchedPayment.id,
+              phoneNumberInput.trim(),
+            );
+            await appState.payOrder(orderId, {});
+          } else {
+            await appState.addOrderPayment(
+              orderId,
+              finalAmount,
+              matchedPayment.id,
+              null,
+            );
+            await appState.payOrder(orderId, {
+              card_number: cardNo.trim(),
+              expiry_date: cardExpiry.trim(),
+              cvv: cardCvv.trim(),
+            });
+          }
+        } catch (paymentErr) {
+          console.warn("[Payment Flow] Payment trigger skipped:", paymentErr);
+        }
+      }
+
+      appState.cartItems = [];
+      startStatusPolling(orderId);
+    } catch (err) {
+      console.error("[Cart Checkout Failure] Processing error:", err);
+      isCheckingStatus = false;
+      const serverMessage = err.response?.data?.message || 
+                            err.response?.data?.error || 
+                            err.message || 
+                            "Checkout request could not be completed.";
+      appState.addToast(serverMessage, "error");
     }
   }
 
-  function confirmLocation() {
-    checkoutStep = 3;
+  function toggleFulfillment() {
+    const targetMode = hasDelivery ? "pickup" : "delivery";
+    appState.cartItems.forEach((item) => {
+      item.fulfillment = targetMode;
+    });
   }
 
-  function processOrder() {
-    // Generate a simulated Ugandan Postal tracking code
-    trackingId = `UG-POSTA-${Math.floor(100000 + Math.random() * 900000)}`;
-    checkoutStep = 4;
+  // --- REAL-TIME PAYMENT VALIDATORS ---
+
+  function validateLuhn(cardNumber) {
+    const clean = cardNumber.replace(/\D/g, "");
+    if (!clean || clean.length < 13 || clean.length > 19) return false;
+
+    let sum = 0;
+    let shouldDouble = false;
+    for (let i = clean.length - 1; i >= 0; i--) {
+      let digit = parseInt(clean.charAt(i), 10);
+      if (shouldDouble) {
+        digit *= 2;
+        if (digit > 9) digit -= 9;
+      }
+      sum += digit;
+      shouldDouble = !shouldDouble;
+    }
+    return sum % 10 === 0;
   }
 
-  function finalizeCheckout() {
-    appState.cartItems = [];
-    isCheckoutOpen = false;
-    checkoutStep = 1;
-    isOtpSent = false;
-    phone = "";
-    otpCode = "";
+  function validateExpiry(expiry) {
+    const clean = expiry.replace(/\s/g, "");
+    if (!/^\d{2}\/\d{2}$/.test(clean)) return false;
+
+    const [mStr, yStr] = clean.split("/");
+    const month = parseInt(mStr, 10);
+    const year = parseInt("20" + yStr, 10);
+
+    if (month < 1 || month > 12) return false;
+
+    const now = new Date();
+    const currentMonth = now.getMonth() + 1;
+    const currentYear = now.getFullYear();
+
+    if (year < currentYear) return false;
+    if (year === currentYear && month < currentMonth) return false;
+
+    return true;
   }
+
+  function validateCvv(cvv) {
+    const clean = cvv.replace(/\D/g, "");
+    return clean.length === 3 || clean.length === 4;
+  }
+
+  // --- INPUT FORMATTERS / MASKS ---
+
+  function handleCardInput(e) {
+    let value = e.target.value.replace(/\D/g, "");
+    let matches = value.substring(0, 16).match(/\d{1,4}/g);
+    cardNo = matches ? matches.join(" ") : "";
+  }
+
+  function handleExpiryInput(e) {
+    let value = e.target.value.replace(/\D/g, "");
+    if (value.length > 2) {
+      cardExpiry = value.substring(0, 2) + "/" + value.substring(2, 4);
+    } else {
+      cardExpiry = value;
+    }
+  }
+
+  function handleCvvInput(e) {
+    cardCvv = e.target.value.replace(/\D/g, "").substring(0, 4);
+  }
+
+  // --- REACTIVE VALIDATION MAPS ---
+
+  let isCardNoValid = $derived(validateLuhn(cardNo));
+  let isExpiryValid = $derived(validateExpiry(cardExpiry));
+  let isCvvValid = $derived(validateCvv(cardCvv));
+
+  let isCardFormValid = $derived(isCardNoValid && isExpiryValid && isCvvValid);
+  let isMomoValid = $derived(
+    /^\+?\d{9,15}$/.test(phoneNumberInput.replace(/\s/g, "")),
+  );
 </script>
 
 <div class="space-y-8 select-none font-sans py-2">
-  <!-- Breadcrumbs -->
   <nav class="flex items-center gap-2 text-xs font-semibold text-slate-400">
     <a href="/" class="hover:text-slate-900 transition-colors">Catalog</a>
     <span class="text-slate-300">/</span>
-    <span class="text-slate-900 font-bold">Shopping Basket</span>
+    <span class="text-slate-900 font-bold">Checkout</span>
   </nav>
 
-  {#if appState.cartItems.length === 0}
-    <!-- Clean Empty State -->
+  {#if isCheckingStatus}
+    <!-- LOADING INTERFACE: STEP PROGRESS TRACKER -->
+    <div
+      class="max-w-xl mx-auto py-16 text-center space-y-8 animate-in fade-in duration-300"
+    >
+      <div class="relative w-16 h-16 mx-auto">
+        <div
+          class="absolute inset-0 rounded-full border-4 border-slate-100 animate-pulse"
+        ></div>
+        <div
+          class="absolute inset-0 rounded-full border-4 border-transparent border-t-[#0aad0a] animate-spin"
+        ></div>
+      </div>
+
+      <div class="space-y-2">
+        <h2 class="text-lg font-bold text-slate-900 tracking-tight">
+          Verifying Payment Status
+        </h2>
+        <p
+          class="text-xs text-slate-500 max-w-xs mx-auto leading-relaxed font-light"
+        >
+          Securing authorization from your payment provider. Please wait.
+        </p>
+      </div>
+
+      <div
+        class="bg-white border border-slate-200 p-6 rounded-2xl max-w-sm mx-auto space-y-4 text-left"
+      >
+        <!-- Stage 1 -->
+        <div class="flex items-center gap-3">
+          <div
+            class="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0
+            {[
+              'PENDING_CONFIRMATION',
+              'PENDING_PAYMENT',
+              'PROCESSING_PAYMENT',
+              'CONFIRMED',
+            ].includes(currentOrderStatus)
+              ? 'bg-[#0aad0a] text-white'
+              : 'bg-slate-100 text-slate-400'}"
+          >
+            1
+          </div>
+          <div>
+            <p class="text-xs font-bold text-slate-900">Order Created</p>
+            <p class="text-[10px] text-slate-400 font-light">
+              Fulfillment coordinates locked.
+            </p>
+          </div>
+        </div>
+
+        <!-- Stage 2 -->
+        <div class="flex items-center gap-3">
+          <div
+            class="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0
+            {['PROCESSING_PAYMENT', 'CONFIRMED'].includes(currentOrderStatus)
+              ? 'bg-[#0aad0a] text-white'
+              : currentOrderStatus === 'PENDING_PAYMENT'
+                ? 'bg-amber-400 text-slate-950 animate-pulse'
+                : 'bg-slate-100 text-slate-400'}"
+          >
+            2
+          </div>
+          <div>
+            <p class="text-xs font-bold text-slate-900">
+              Payment Authorization
+            </p>
+            <p class="text-[10px] text-slate-400 font-light">
+              Verifying with carrier network.
+            </p>
+          </div>
+        </div>
+
+        <!-- Stage 3 -->
+        <div class="flex items-center gap-3">
+          <div
+            class="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0
+            {currentOrderStatus === 'CONFIRMED'
+              ? 'bg-[#0aad0a] text-white'
+              : 'bg-slate-100 text-slate-400'}"
+          >
+            3
+          </div>
+          <div>
+            <p class="text-xs font-bold text-slate-900">Logistics Dispatch</p>
+            <p class="text-[10px] text-slate-400 font-light">
+              Redirecting to Order History log...
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div
+        class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-50 border border-slate-200 text-[10px] font-bold text-slate-500 font-mono tracking-wide uppercase"
+      >
+        <span class="w-1.5 h-1.5 rounded-full bg-[#0aad0a] animate-ping"></span>
+        Status: {currentOrderStatus.replace(/_/g, " ")}
+      </div>
+    </div>
+  {:else if appState.cartItems.length === 0}
+    <!-- EMPTY BASKET -->
     <div class="text-center py-20 space-y-4 max-w-md mx-auto">
       <div
-        class="w-16 h-16 bg-slate-50 border border-slate-100 rounded-full flex items-center justify-center mx-auto text-3xl"
+        class="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto text-slate-400"
       >
-        🧺
+        <svg
+          class="w-8 h-8"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.8"
+          viewBox="0 0 24 24"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            d="M15.75 10.5V6a3.75 3.75 0 1 0-7.5 0v4.5m11.356-1.993 1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 0 1-1.12-1.243l1.264-12A1.125 1.125 0 0 1 5.513 7.5h12.974c.576 0 1.059.435 1.119 1.007ZM8.625 10.5a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm7.5 0a.375 3.75 0 1 1-.75 0 .375 3.75 0 0 1 .75 0Z"
+          />
+        </svg>
       </div>
       <div class="space-y-1">
-        <h2 class="text-base  text-slate-800 tracking-tight">
-          Your basket is empty!
+        <h2 class="text-sm text-slate-800 tracking-tight font-bold">
+          Your basket is empty
         </h2>
-        <p class="text-xs text-slate-500 leading-relaxed font-semibold">
-         
-        </p>
       </div>
       <a
         href="/"
-        class="inline-block bg-[#0aad0a] hover:bg-[#099409] text-white text-xs font-black px-6 py-2.5 rounded-full transition-all"
+        class="inline-block bg-[#0aad0a] hover:bg-[#099409] text-white text-xs font-semibold px-6 py-2.5 rounded-full transition-all"
       >
-       Continue Shopping
+        Continue Shopping
       </a>
     </div>
   {:else}
-    <!-- Active Cart split panel layout -->
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-10">
-      <!-- Left Panel: Line Items (No heavy card shells, clean rules) -->
+    <!-- ACTIVE CHECKOUT VIEW -->
+    <div
+      class="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start rounded-lg bg-slate-50 p-3"
+    >
       <div class="lg:col-span-8 space-y-6">
-        <div class="border-b border-slate-200/60 pb-3">
-          <h2 class="text-base font-black text-slate-900 tracking-tight">
-            Basket Items
-          </h2>
-        </div>
-
-        <div class="divide-y divide-slate-100">
-          {#each appState.cartItems as item (item.product.id)}
-            <div
-              class="py-5 flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center first:pt-0 last:pb-0"
+        <!-- Fulfillment Mode -->
+        <div class="rounded-2xl p-6 bg-white space-y-4">
+          <div class="border-b border-slate-100 pb-3">
+            <h3
+              class="text-xs font-black text-slate-400 uppercase tracking-widest"
             >
-              <div class="flex items-center gap-4 min-w-0">
-                <div class=" ">
-                  <img
-                    src={item.product.images[0]}
-                    alt=""
-                    class="w-14 h-14 rounded-xl bg-slate-50 object-cover"
-                  />
-                </div>
-                <div class="min-w-0">
-                  <h4
-                    class="text-sm text-slate-900 leading-snug line-clamp-3 max-w-[160px] sm:max-w-[200px] text-slate-900 truncate max-w-[200px] sm:max-w-md"
-                  >
-                    {item.product.name}
-                  </h4>
-                  <p
-                    class="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5"
-                  >
-                    By {item.product.seller}
-                  </p>
-                  <div class="text- min-w-[100px]">
-                    <p class="text-xs font-black text-slate-900">
-                      {(item.product.price * item.quantity).toLocaleString()} UGX
-                    </p>
-                    <p class="text-[9px] text-slate-400 font-semibold mt-0.5">
-                      {item.product.price.toLocaleString()} UGX each
-                    </p>
-                  </div>
-                  <!-- Per-Item Fulfillment Toggles -->
-                  <!-- <div class="flex items-center gap-2 mt-2">
-                    <button 
-                      onclick={() => item.fulfillment = 'pickup'}
-                      class="text-[9px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full border transition-all focus:outline-none
-                        {item.fulfillment === 'pickup' ? 'bg-slate-900 border-slate-900 text-white shadow-xs' : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'}"
-                    >
-                      Post Pickup
-                    </button>
-                    <button 
-                      onclick={() => item.fulfillment = 'delivery'}
-                      class="text-[9px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full border transition-all focus:outline-none
-                        {item.fulfillment === 'delivery' ? 'bg-slate-900 border-slate-900 text-white shadow-xs' : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'}"
-                    >
-                      Home Delivery
-                    </button>
-                  </div> -->
+              Fulfillment Routing Mode
+            </h3>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <button
+              onclick={toggleFulfillment}
+              class="w-full text-left p-4 rounded-xl border-2 transition-all flex items-start gap-3 focus:outline-none
+                {!hasDelivery
+                ? 'border-[#0aad0a] bg-emerald-50/10'
+                : 'border-slate-200 bg-white hover:border-slate-300'}"
+            >
+              <div class="pt-0.5">
+                <div
+                  class="w-4 h-4 rounded-full border flex items-center justify-center {!hasDelivery
+                    ? 'border-[#0aad0a]'
+                    : 'border-slate-300'}"
+                >
+                  {#if !hasDelivery}
+                    <div class="w-2 h-2 rounded-full bg-[#0aad0a]"></div>
+                  {/if}
                 </div>
               </div>
-
-              <!-- Price & Springy Stepper controls -->
-
-              <div class="flex items-center gap-3 shrink-0">
-                <div
-                  class="flex items-center border border-slate-200/80 rounded-full h-7 bg-slate-50/50 select-none"
+              <div>
+                <span class="text-sm font-bold text-slate-900 block"
+                  >Post Office Pickup</span
                 >
-                  <button
-                    onclick={() => adjustQuantity(item, -1)}
-                    class="{item.quantity > 1
-                      ? ' w-8 text-[#0aad0a]  '
-                      : 'w-8 text-red-500 px-1.5'} hover:bg-slate-100 h-6 rounded-l-full flex items-center justify-center font-semibold text-xl focus:outline-none"
-                  >
-                    {#if item.quantity == 1}
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        x="0px"
-                        y="0px"
-                        width="100"
-                        height="100"
-                        viewBox="0 0 30 30"
+              </div>
+            </button>
+
+            <button
+              onclick={toggleFulfillment}
+              class="w-full text-left p-4 rounded-xl border-2 transition-all flex items-start gap-3 focus:outline-none
+                {hasDelivery
+                ? 'border-[#0aad0a] bg-emerald-50/10'
+                : 'border-slate-200 bg-white hover:border-slate-300'}"
+            >
+              <div class="pt-0.5">
+                <div
+                  class="w-4 h-4 rounded-full border flex items-center justify-center {hasDelivery
+                    ? 'border-[#0aad0a]'
+                    : 'border-slate-300'}"
+                >
+                  {#if hasDelivery}
+                    <div class="w-2 h-2 rounded-full bg-[#0aad0a]"></div>
+                  {/if}
+                </div>
+              </div>
+              <div>
+                <span class="text-sm text-slate-900 block font-bold"
+                  >Alternative Delivery</span
+                >
+              </div>
+            </button>
+          </div>
+        </div>
+
+        <!-- Coordinates Details -->
+        <div class="rounded-2xl p-6 bg-white space-y-4">
+          <div
+            class="flex items-center justify-between border-b border-slate-100 pb-3"
+          >
+            <h3
+              class="text-xs font-black text-slate-400 uppercase tracking-widest"
+            >
+              Delivery Location
+            </h3>
+            <button
+              onclick={() => (appState.isLocationModalOpen = true)}
+              class="text-xs font-bold text-[#0aad0a] hover:underline focus:outline-none"
+            >
+              Change
+            </button>
+          </div>
+
+          <div class="flex items-start gap-4">
+            <div
+              class="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 shrink-0"
+            >
+              <svg
+                class="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"
+                />
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25s-7.5-4.108-7.5-11.25a7.5 7.5 0 1 1 15 0z"
+                />
+              </svg>
+            </div>
+
+            <div class="space-y-3 flex-1 min-w-0">
+              {#if hasDelivery}
+                {#if appState.customerAddresses.length > 0}
+                  {@const currentAddr =
+                    appState.customerAddresses.find(
+                      (a) =>
+                        String(a.id) === String(appState.selectedAddressId),
+                    ) || appState.customerAddresses[0]}
+                  {#if currentAddr}
+                    <p class="text-sm font-semibold text-slate-900">
+                      Direct Delivery
+                    </p>
+                    <p class="text-xs text-slate-500 font-light">
+                      {currentAddr.building_name &&
+                      currentAddr.building_name !== "N/A"
+                        ? currentAddr.building_name + " • "
+                        : ""}
+                      {currentAddr.street || "Sourced Coordinates"},
+                      {currentAddr.city || "Kampala"}
+                    </p>
+                  {:else}
+                    <p class="text-sm font-semibold text-slate-900">
+                      Direct Delivery
+                    </p>
+                    <p class="text-xs text-slate-500 font-light">
+                      Loading coordinates...
+                    </p>
+                  {/if}
+
+                  {#if appState.customerAddresses.length > 1}
+                    <div class="pt-2">
+                      <label
+                        for="address-selector"
+                        class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5"
+                        >Select Delivery Coordinates</label
                       >
-                        <path
-                          d="M 14.984375 2.4863281 A 1.0001 1.0001 0 0 0 14 3.5 L 14 4 L 8.5 4 A 1.0001 1.0001 0 0 0 7.4863281 5 L 6 5 A 1.0001 1.0001 0 1 0 6 7 L 24 7 A 1.0001 1.0001 0 1 0 24 5 L 22.513672 5 A 1.0001 1.0001 0 0 0 21.5 4 L 16 4 L 16 3.5 A 1.0001 1.0001 0 0 0 14.984375 2.4863281 z M 6 9 L 7.7929688 24.234375 C 7.9109687 25.241375 8.7633438 26 9.7773438 26 L 20.222656 26 C 21.236656 26 22.088031 25.241375 22.207031 24.234375 L 24 9 L 6 9 z"
-                        ></path>
-                      </svg>
-                    {:else}
-                      −
+                      <select
+                        id="address-selector"
+                        bind:value={appState.selectedAddressId}
+                        class="w-full text-xs font-semibold text-slate-700 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 focus:border-[#003d29] focus:outline-none cursor-pointer transition-colors"
+                      >
+                        {#each appState.customerAddresses as addr (addr.id)}
+                          <option value={addr.id}>
+                            {addr.building_name && addr.building_name !== "N/A"
+                              ? addr.building_name + " • "
+                              : ""}
+                            {addr.street || "Saved Location"} ({addr.city})
+                          </option>
+                        {/each}
+                      </select>
+                    </div>
+                  {/if}
+                {:else}
+                  <p class="text-sm font-semibold text-slate-900">
+                    No Shipping Address Saved
+                  </p>
+                  <a
+                    href="/account/myaddress"
+                    class="text-xs text-red-500 hover:underline"
+                    >Register address coordinates in settings</a
+                  >
+                {/if}
+              {:else}
+                <p class="text-sm font-semibold text-slate-900">
+                  Post Office Smart Pickup
+                </p>
+                <p class="text-xs text-slate-500 font-light mb-1.5">
+                  Hold safely at {appState.activeBranch}
+                </p>
+
+                <div class="pt-2">
+                  <label
+                    for="station-selector"
+                    class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5"
+                    >Select Pickup Station</label
+                  >
+                  <select
+                    id="station-selector"
+                    bind:value={appState.activeBranch}
+                    class="w-full text-xs font-semibold text-slate-700 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 focus:border-[#003d29] focus:outline-none cursor-pointer transition-colors"
+                  >
+                    {#each stations as station}
+                      <option value={station.value}>{station.label}</option>
+                    {/each}
+                  </select>
+                </div>
+              {/if}
+            </div>
+          </div>
+        </div>
+
+        <!-- Payment Selection -->
+        <div class="rounded-2xl p-6 bg-white space-y-4">
+          <div
+            class="flex items-center justify-between border-b border-slate-100 pb-3"
+          >
+            <h3
+              class="text-xs font-black text-slate-400 uppercase tracking-widest"
+            >
+              Pay with
+            </h3>
+          </div>
+
+          <div
+            class="flex bg-slate-100 p-1 rounded-xl gap-1 shrink-0 w-full select-none"
+          >
+            <button
+              type="button"
+              onclick={() => (paymentType = "momo")}
+              class="flex-1 py-2 text-xs font-semibold rounded-lg transition-all focus:outline-none cursor-pointer
+                {paymentType === 'momo'
+                ? 'bg-white text-slate-900 shadow-xs font-bold'
+                : 'text-slate-500 hover:text-slate-800'}"
+            >
+              Mobile Money
+            </button>
+            <button
+              type="button"
+              onclick={() => (paymentType = "card")}
+              class="flex-1 py-2 text-xs font-semibold rounded-lg transition-all focus:outline-none cursor-pointer
+                {paymentType === 'card'
+                ? 'bg-white text-slate-900 shadow-xs font-bold'
+                : 'text-slate-500 hover:text-slate-800'}"
+            >
+              Debit / Credit Card
+            </button>
+          </div>
+
+          {#if paymentType === "momo"}
+            <div class="space-y-4 animate-in fade-in duration-200">
+              <div class="grid grid-cols-2 gap-3 select-none">
+                <button
+                  type="button"
+                  onclick={() => (paymentProvider = "mtn")}
+                  class="p-3.5 rounded-xl border-2 transition-all flex items-center justify-between focus:outline-none text-left cursor-pointer
+                    {paymentProvider === 'mtn'
+                    ? 'border-[#0aad0a] bg-emerald-50/10'
+                    : 'border-slate-200 bg-white hover:border-slate-300'}"
+                >
+                  <div class="flex items-center gap-3">
+                    <span
+                      class="w-8 h-6 bg-[#FFCC00] rounded flex items-center justify-center text-[9px] font-black text-slate-950 shadow-xs"
+                      >momo</span
+                    >
+                    <span class="text-xs font-bold text-slate-900"
+                      >MTN MoMo</span
+                    >
+                  </div>
+                  <div
+                    class="w-4 h-4 rounded-full border flex items-center justify-center {paymentProvider ===
+                    'mtn'
+                      ? 'border-[#0aad0a]'
+                      : 'border-slate-300'}"
+                  >
+                    {#if paymentProvider === "mtn"}
+                      <div class="w-2 h-2 rounded-full bg-[#0aad0a]"></div>
                     {/if}
-                  </button>
-                  <span class="px-2 text-xl text-slate-800"
-                    >{item.quantity}</span
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onclick={() => (paymentProvider = "airtel")}
+                  class="p-3.5 rounded-xl border-2 transition-all flex items-center justify-between focus:outline-none text-left cursor-pointer
+                    {paymentProvider === 'airtel'
+                    ? 'border-[#0aad0a] bg-emerald-50/10'
+                    : 'border-slate-200 bg-white hover:border-slate-300'}"
+                >
+                  <div class="flex items-center gap-3">
+                    <span
+                      class="w-8 h-6 bg-[#E11900] rounded flex items-center justify-center text-[9px] font-black text-white shadow-xs"
+                      >airtel</span
+                    >
+                    <span class="text-xs font-bold text-slate-900"
+                      >Airtel Money</span
+                    >
+                  </div>
+                  <div
+                    class="w-4 h-4 rounded-full border flex items-center justify-center {paymentProvider ===
+                    'airtel'
+                      ? 'border-[#0aad0a]'
+                      : 'border-slate-300'}"
                   >
-                  <button
-                    onclick={() => adjustQuantity(item, +1)}
-                    class="w-8 h-6 rounded-r-full flex items-center justify-center text-[#0aad0a] hover:bg-slate-100 font-semibold text-xl focus:outline-none"
-                    >+</button
+                    {#if paymentProvider === "airtel"}
+                      <div class="w-2 h-2 rounded-full bg-[#0aad0a]"></div>
+                    {/if}
+                  </div>
+                </button>
+              </div>
+
+              <div
+                class="border rounded-[14px] px-4 pt-2.5 pb-3 flex flex-col bg-white transition-colors
+                {phoneNumberInput.length > 0 && !isMomoValid
+                  ? 'border-red-500 focus-within:border-red-500 focus-within:ring-red-500'
+                  : 'border-slate-300 focus-within:border-[#1a1a1a] focus-within:ring-[#1a1a1a]'}"
+              >
+                <label
+                  for="payment-phone"
+                  class="text-[11px] text-neutral-500 font-normal select-none mb-0.5"
+                  >Mobile Wallet Phone Number</label
+                >
+                <input
+                  type="text"
+                  id="payment-phone"
+                  bind:value={phoneNumberInput}
+                  placeholder="+256 772 123456"
+                  class="outline-none text-[15px] text-[#333] bg-transparent w-full p-0 border-0 focus:ring-0 leading-normal font-mono text-xs"
+                />
+              </div>
+            </div>
+          {:else}
+            <div class="space-y-4 animate-in fade-in duration-200">
+              <div
+                class="border rounded-[14px] px-4 pt-2.5 pb-3 flex flex-col bg-white transition-colors
+                {cardNo.length > 0 && !isCardNoValid
+                  ? 'border-red-500 focus-within:border-red-500 focus-within:ring-red-500'
+                  : 'border-slate-300 focus-within:border-[#1a1a1a] focus-within:ring-[#1a1a1a]'}"
+              >
+                <label
+                  for="card-no"
+                  class="text-[11px] text-neutral-500 font-normal select-none mb-0.5"
+                  >Card Number</label
+                >
+                <input
+                  type="text"
+                  id="card-no"
+                  value={cardNo}
+                  oninput={handleCardInput}
+                  placeholder="0000 0000 0000 0000"
+                  class="outline-none text-[15px] text-[#333] bg-transparent w-full p-0 border-0 focus:ring-0 leading-normal font-mono text-xs"
+                />
+              </div>
+
+              <div class="grid grid-cols-2 gap-3">
+                <div
+                  class="border rounded-[14px] px-4 pt-2.5 pb-3 flex flex-col bg-white transition-colors
+                  {cardExpiry.length > 0 && !isExpiryValid
+                    ? 'border-red-500 focus-within:border-red-500 focus-within:ring-red-500'
+                    : 'border-slate-300 focus-within:border-[#1a1a1a] focus-within:ring-[#1a1a1a]'}"
+                >
+                  <label
+                    for="card-expiry"
+                    class="text-[11px] text-neutral-500 font-normal select-none mb-0.5"
+                    >Expiry Date</label
                   >
+                  <input
+                    type="text"
+                    id="card-expiry"
+                    value={cardExpiry}
+                    oninput={handleExpiryInput}
+                    placeholder="MM/YY"
+                    class="outline-none text-[15px] text-[#333] bg-transparent w-full p-0 border-0 focus:ring-0 leading-normal font-mono text-xs"
+                  />
+                </div>
+
+                <div
+                  class="border rounded-[14px] px-4 pt-2.5 pb-3 flex flex-col bg-white transition-colors
+                  {cardCvv.length > 0 && !isCvvValid
+                    ? 'border-red-500 focus-within:border-red-500 focus-within:ring-red-500'
+                    : 'border-slate-300 focus-within:border-[#1a1a1a] focus-within:ring-[#1a1a1a]'}"
+                >
+                  <label
+                    for="card-cvv"
+                    class="text-[11px] text-neutral-500 font-normal select-none mb-0.5"
+                    >Security Code (CVV)</label
+                  >
+                  <input
+                    type="text"
+                    id="card-cvv"
+                    value={cardCvv}
+                    oninput={handleCvvInput}
+                    placeholder="123"
+                    class="outline-none text-[15px] text-[#333] bg-transparent w-full p-0 border-0 focus:ring-0 leading-normal font-mono text-xs"
+                  />
                 </div>
               </div>
             </div>
-          {/each}
+          {/if}
+        </div>
+
+        <div class="rounded-2xl p-6 bg-white space-y-4">
+          <div class="border-b border-slate-100 pb-3">
+            <h3
+              class="text-xs font-black text-slate-400 uppercase tracking-widest"
+            >
+              Your Items ({appState.cartCount})
+            </h3>
+          </div>
+          <div class="divide-y divide-slate-100">
+            {#each appState.cartItems as item (item.product.id)}
+              <CartProductCard {item} {adjustQuantity} />
+            {/each}
+          </div>
         </div>
       </div>
 
-      <!-- Right Panel: Sticky Summary Box (Sleek minimalist panel) -->
-      <div class="lg:col-span-4 h-fit sticky top-24">
-        <div
-          class="border border-slate-200 rounded-2xl p-5 bg-white space-y-4 shadow-xs"
-        >
+      <div class="lg:col-span-4 h-fit lg:sticky lg:top-24">
+        <div class="rounded-2xl p-6 bg-white space-y-5 shadow-xs">
           <h4
-            class="text-xs font-black text-slate-900 uppercase tracking-widest border-b border-slate-200 pb-2.5 select-none"
+            class="text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-3"
           >
-            Order Summary
+            Summary
           </h4>
 
-          <div class="space-y-2 text-xs font-semibold text-slate-500">
+          <div class="space-y-2.5 text-xs text-slate-500">
             <div class="flex justify-between">
-              <span>Subtotal</span>
+              <span>Items cost</span>
               <span class="text-slate-900 font-bold"
                 >{subtotal.toLocaleString()} UGX</span
               >
             </div>
 
             <div class="flex justify-between items-center">
-              <span>National Postage Routing</span>
+              <span>Delivery fee</span>
               {#if shippingFee === 0}
-                <span
-                  class="text-emerald-700 font-black bg-emerald-50 px-2 py-0.5 rounded-sm text-[9px] uppercase"
-                  >Free Branch Pickup</span
-                >
+                <span class="text-emerald-700 font-bold">Free</span>
               {:else}
                 <span class="text-slate-900 font-bold"
                   >+{shippingFee.toLocaleString()} UGX</span
                 >
               {/if}
             </div>
-
-            <!-- Contextual Savings Pill -->
-            <div class="flex pt-1.5 select-none">
-              <span
-                class="bg-[#ffd200] text-slate-900 text-[9px] font-black uppercase px-2 py-1 rounded"
-              >
-                🏷️ MoMo Cash-back active
-              </span>
-            </div>
           </div>
 
           <div
-            class="border-t border-slate-200 pt-3 flex justify-between items-baseline"
+            class="border-t border-slate-200 pt-4 flex justify-between items-baseline"
           >
-            <span class="text-xs font-bold text-slate-900">Total Price</span>
-            <span class="text-lg font-black text-slate-900"
-              >{total.toLocaleString()} UGX</span
-            >
+            <span class="text-xs font-bold text-slate-900">Subtotal</span>
+            <span class="text-lg font-extrabold text-slate-900">
+              {Math.max(0, total).toLocaleString()} UGX
+            </span>
           </div>
 
           <button
-            onclick={() => (isCheckoutOpen = true)}
-            class="w-full bg-[#0aad0a] hover:bg-[#099409] text-white font-extrabold text-xs h-12 rounded-full transition-all shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-emerald-600"
+            onclick={processOrder}
+            disabled={(hasDelivery &&
+              appState.customerAddresses.length === 0) ||
+              (paymentType === "card" ? !isCardFormValid : !isMomoValid)}
+            class="w-full bg-[#0aad0a] hover:bg-[#099409] disabled:bg-slate-200 disabled:text-slate-400 text-white font-extrabold text-xs h-11 rounded-full flex items-center justify-center transition-all shadow-md focus:outline-none cursor-pointer"
           >
-            Place  Order
+            Place Order
           </button>
+
+          <p class="text-[10px] text-slate-400 leading-normal text-center">
+            By completing checkout, you authorize ePosta package logistics
+            coordinates.
+          </p>
         </div>
       </div>
     </div>
   {/if}
 </div>
-<!-- CHECKOUT FLOW WIZARD DIALOG OVERLAY -->
-{#if isCheckoutOpen}
-  <div
-    class="fixed inset-0 z-[100] bg-slate-950/40 backdrop-blur-xs flex items-center justify-center p-4"
-  >
-    <div
-      class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200/50 relative animate-in zoom-in-95 duration-200"
-    >
-      <!-- Stepped Header Track Indicators -->
-      {#if checkoutStep < 4}
-        <div
-          class="flex items-center justify-between mb-6 border-b border-slate-100 pb-4 select-none text-[10px] font-black uppercase tracking-wider text-slate-400"
-        >
-          <span>Checkout step {checkoutStep} of 3</span>
-          <span class="text-slate-800">
-            {#if checkoutStep === 1}Secure Sign-In{:else if checkoutStep === 2}Location
-              Details{:else}Payment Routing{/if}
-          </span>
-        </div>
-      {/if}
-
-      <!-- STEP 1: SMS SECURE ENTER -->
-      {#if checkoutStep === 1}
-        <div class="space-y-4">
-          <div class="space-y-1">
-            <h3
-              class="text-sm font-black text-slate-900 uppercase tracking-wider"
-            >
-              Secure Phone Sign-In
-            </h3>
-            <p class="text-xs text-slate-500 leading-relaxed font-medium">
-              Verify your phone number with a secure One-Time PIN. No passwords
-              required.
-            </p>
-          </div>
-
-          <div class="space-y-3">
-            <div>
-              <label
-                for="checkout-page-phone"
-                class="text-[10px] font-black uppercase tracking-wider text-slate-400 block mb-1"
-                >Mobile Phone Number</label
-              >
-              <div class="relative">
-                <input
-                  id="checkout-page-phone"
-                  type="tel"
-                  placeholder="e.g. +256 772 123456"
-                  bind:value={phone}
-                  disabled={isOtpSent}
-                  class="w-full pl-12 pr-4 py-2.5 bg-slate-50 border border-slate-200 focus:border-slate-400 rounded-xl text-xs font-bold focus:outline-none"
-                />
-                <span
-                  class="absolute left-4 top-3 text-xs font-extrabold text-slate-400 select-none"
-                  >🇺🇬</span
-                >
-              </div>
-            </div>
-
-            {#if isOtpSent}
-              <div class="space-y-1.5 animate-in fade-in duration-200">
-                <label
-                  for="checkout-page-otp"
-                  class="text-[10px] font-black uppercase tracking-wider text-slate-400 block"
-                  >Verification PIN (SMS)</label
-                >
-                <input
-                  id="checkout-page-otp"
-                  type="text"
-                  maxlength="4"
-                  placeholder="Enter 4-digit code"
-                  bind:value={otpCode}
-                  oninput={verifyOtp}
-                  class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 focus:border-slate-400 rounded-xl text-xs font-bold tracking-[0.25em] text-center focus:outline-none"
-                />
-              </div>
-            {/if}
-          </div>
-
-          <div class="pt-2">
-            {#if !isOtpSent}
-              <button
-                onclick={triggerOtp}
-                disabled={!phone}
-                class="w-full bg-[#0aad0a] hover:bg-[#099409] disabled:bg-slate-200 text-white font-bold text-xs py-3 rounded-full transition-all focus:outline-none"
-              >
-                Send Verification PIN
-              </button>
-            {/if}
-          </div>
-        </div>
-      {/if}
-
-      <!-- STEP 2: COURIER LOCATION ROUTING -->
-      {#if checkoutStep === 2}
-        <div class="space-y-4">
-          <div class="space-y-1">
-            <h3
-              class="text-sm font-black text-slate-900 uppercase tracking-wider"
-            >
-              Confirm Fulfillment Location
-            </h3>
-            <p class="text-xs text-slate-500 leading-relaxed font-medium">
-              Configure where national couriers will route your items.
-            </p>
-          </div>
-
-          {#if hasDelivery}
-            <div class="space-y-2">
-              <label
-                for="checkout-page-address"
-                class="text-[10px] font-black uppercase tracking-wider text-slate-400 block"
-                >Delivery Address Details</label
-              >
-              <textarea
-                id="checkout-page-address"
-                rows="3"
-                placeholder="District, Village, Street Name, House Number or Landmarking cues..."
-                bind:value={deliveryAddress}
-                class="w-full p-4 bg-slate-50 border border-slate-200 focus:border-slate-400 rounded-xl text-xs font-semibold focus:outline-none resize-none leading-relaxed"
-              ></textarea>
-            </div>
-          {:else}
-            <div
-              class="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-1 text-xs"
-            >
-              <p
-                class="text-[9px] font-black tracking-wider text-slate-400 uppercase select-none"
-              >
-                Selected Posta Branch
-              </p>
-              <p class="font-bold text-slate-900">{appState.activeBranch}</p>
-              <p
-                class="text-[11px] text-slate-500 leading-relaxed pt-1 font-medium"
-              >
-                Your package will be held securely here. You'll receive an SMS
-                arrival alert.
-              </p>
-            </div>
-          {/if}
-
-          <button
-            onclick={confirmLocation}
-            disabled={hasDelivery && !deliveryAddress}
-            class="w-full bg-slate-900 hover:bg-slate-800 disabled:bg-slate-200 text-white font-bold text-xs py-3 rounded-xl transition-all focus:outline-none"
-          >
-            Continue to Payment
-          </button>
-        </div>
-      {/if}
-
-      <!-- STEP 3: COURIER PAYMENT PROVIDER -->
-      {#if checkoutStep === 3}
-        <div class="space-y-4">
-          <div class="space-y-1">
-            <h3
-              class="text-sm font-black text-slate-900 uppercase tracking-wider"
-            >
-              Subsidized Payment Routing
-            </h3>
-            <p class="text-xs text-slate-500 leading-relaxed font-medium">
-              Select a payment provider. Secure transaction routed instantly.
-            </p>
-          </div>
-
-          <div class="grid grid-cols-3 gap-2.5 select-none">
-            <button
-              onclick={() => (paymentProvider = "mtn")}
-              class="border-2 p-3 rounded-2xl flex flex-col items-center justify-between h-20 transition-all focus:outline-none {paymentProvider ===
-              'mtn'
-                ? 'border-amber-400 bg-amber-50/50'
-                : 'border-slate-200 bg-white'}"
-            >
-              <span
-                class="w-5 h-5 bg-amber-400 rounded-full flex items-center justify-center text-[10px] font-black text-slate-950"
-                >M</span
-              >
-              <span class="text-[9px] font-black text-slate-800 uppercase"
-                >MTN MoMo</span
-              >
-            </button>
-            <button
-              onclick={() => (paymentProvider = "airtel")}
-              class="border-2 p-3 rounded-2xl flex flex-col items-center justify-between h-20 transition-all focus:outline-none {paymentProvider ===
-              'airtel'
-                ? 'border-red-600 bg-red-50/50'
-                : 'border-slate-200 bg-white'}"
-            >
-              <span
-                class="w-5 h-5 bg-red-600 rounded-full flex items-center justify-center text-[10px] font-black text-white"
-                >A</span
-              >
-              <span class="text-[9px] font-black text-slate-800 uppercase"
-                >Airtel</span
-              >
-            </button>
-            <button
-              onclick={() => (paymentProvider = "counter")}
-              class="border-2 p-3 rounded-2xl flex flex-col items-center justify-between h-20 transition-all focus:outline-none {paymentProvider ===
-              'counter'
-                ? 'border-slate-950 bg-slate-50'
-                : 'border-slate-200 bg-white'}"
-            >
-              <span
-                class="w-5 h-5 bg-slate-900 rounded-full flex items-center justify-center text-[10px] font-black text-white"
-                >P</span
-              >
-              <span class="text-[9px] font-black text-slate-800 uppercase"
-                >Branch Pay</span
-              >
-            </button>
-          </div>
-
-          {#if paymentProvider !== "counter"}
-            <div class="space-y-1.5 animate-in fade-in duration-150">
-              <label
-                for="checkout-page-pay-phone"
-                class="text-[10px] font-black uppercase tracking-wider text-slate-400 block"
-                >Mobile Wallet Phone</label
-              >
-              <div class="relative">
-                <input
-                  id="checkout-page-pay-phone"
-                  type="tel"
-                  placeholder="e.g. +256 772 123456"
-                  bind:value={paymentPhone}
-                  class="w-full pl-12 pr-4 py-2.5 bg-slate-50 border border-slate-200 focus:border-slate-400 rounded-xl text-xs font-bold focus:outline-none"
-                />
-                <span
-                  class="absolute left-4 top-3 text-xs font-extrabold text-slate-400 select-none"
-                  >🇺🇬</span
-                >
-              </div>
-            </div>
-          {/if}
-
-          <button
-            onclick={processOrder}
-            disabled={paymentProvider !== "counter" && !paymentPhone}
-            class="w-full bg-[#0aad0a] hover:bg-[#099409] disabled:bg-slate-200 text-white font-bold text-xs py-3 rounded-full transition-all focus:outline-none"
-          >
-            {paymentProvider === "counter"
-              ? "Confirm Reservation"
-              : "Trigger USSD Payment Prompt"}
-          </button>
-        </div>
-      {/if}
-
-      <!-- STEP 4: TRACKING ORDER SUCCESS -->
-      {#if checkoutStep === 4}
-        <div
-          class="space-y-5 text-center py-4 select-none animate-in zoom-in-95 duration-200"
-        >
-          <div
-            class="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto shadow-sm border border-emerald-100"
-          >
-            <svg
-              class="w-6 h-6"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="3"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                d="M5 13l4 4L19 7"
-              />
-            </svg>
-          </div>
-
-          <div class="space-y-1.5">
-            <h3
-              class="text-xs sm:text-sm font-black text-slate-900 uppercase tracking-wider"
-            >
-              Subsidized Order Processed
-            </h3>
-            <p class="text-xs text-slate-500 leading-relaxed font-medium">
-              Your request has been routed to Posta national logistics.
-            </p>
-          </div>
-
-          <div
-            class="bg-slate-50 border border-slate-200/80 p-4 rounded-2xl space-y-1.5"
-          >
-            <p
-              class="text-[9px] font-black text-slate-400 uppercase tracking-widest"
-            >
-              National Postal Tracking Code
-            </p>
-            <p
-              class="text-sm sm:text-base font-black text-slate-900 tracking-wide"
-            >
-              {trackingId}
-            </p>
-          </div>
-
-          <button
-            onclick={finalizeCheckout}
-            class="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs py-3 rounded-xl transition-all focus:outline-none"
-          >
-            Return to Marketplace
-          </button>
-        </div>
-      {/if}
-
-      <!-- Close popup modal trigger -->
-      {#if checkoutStep < 4}
-        <button
-          onclick={close}
-          class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 focus:outline-none"
-        >
-          <svg
-            class="w-4 h-4"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2.5"
-            viewBox="0 0 24 24"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              d="M6 18L18 6M6 6l12 12"
-            />
-          </svg>
-        </button>
-      {/if}
-    </div>
-    <!-- Closes .bg-white on line 5 -->
-  </div>
-  <!-- Closes .fixed on. line 4 -->
-{/if}
-
-<!-- Closes {#if isCheckoutOpen} on line 3 -->
-
-<style>
-  /* Springy pop micro-interaction on update */
-  @keyframes scale-pop {
-    0% {
-      transform: scale(1);
-    }
-    50% {
-      transform: scale(1.35);
-    }
-    100% {
-      transform: scale(1);
-    }
-  }
-  .animate-pop {
-    animation: scale-pop 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
-  }
-</style>

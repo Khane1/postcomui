@@ -79,7 +79,8 @@
   class="fixed inset-y-0 left-0 z-50 lg:sticky lg:top-[73px] lg:h-[calc(100vh-73px)] lg:overflow-y-auto lg:z-30 lg:flex w-60 bg-white border-r border-slate-100/50 flex-col justify-between p-4 flex-shrink-0 select-none font-sans transition-transform duration-300 ease-in-out lg:transform-none [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden
     {appState.isSidebarOpen
     ? 'translate-x-0'
-    : '-translate-x-full lg:translate-x-0'} "
+    : '-translate-x-full lg:translate-x-0'} 
+    "
 >
   <div class="space-y-4">
     <!-- Header Row -->

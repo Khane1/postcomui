@@ -39,7 +39,6 @@
 
   function handleCategoryClick(categoryId) {
     appState.selectedCategory = categoryId;
-    
     // Smooth scroll down to the product feed anchor instantly
     const anchor = document.getElementById("catalog-grid-anchor");
     if (anchor) {
@@ -48,26 +47,31 @@
   }
 </script>
 
-<div class="bg-white rounded-2xl select-none font-sans">
-  
+<svelte:head>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="true" />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;700;800&display=swap" rel="stylesheet" />
+</svelte:head>
+
+<div class="bg-white rounded-2xl select-none" style="font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;">
   <div class="mb-5 flex items-baseline justify-between">
     <div>
-      <h3 class="text-lg font-black text-slate-900 tracking-tight">Shop by department</h3>
-      <p class="text-xs text-slate-500 font-medium mt-0.5">Explore curated, cooperative-verified categories</p>
+      <h3 class="text-[19px] font-extrabold text-gray-900 tracking-tight">Shop by department</h3>
+      <p class="text-[13px] text-gray-500 font-medium mt-0.5">Explore curated, cooperative-verified categories</p>
     </div>
   </div>
-  
-  <div class="flex gap-3 overflow-x-auto pb-4 scrollbar-none snap-x -mx-4 px-4 sm:mx-0 sm:px-0 sm:pb-0 grid grid-cols-2 md:grid-cols-4 sm:gap-4">
+
+  <div class="flex sm:grid sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 overflow-x-auto sm:overflow-visible pb-4 sm:pb-0 scrollbar-none snap-x -mx-4 px-4 sm:mx-0 sm:px-0">
     {#each categoryCards as card}
       <button 
         onclick={() => handleCategoryClick(card.id)}
-        class="relative flex flex-col justify-between {card.bg} h-36 sm:h-40 w-[150px] sm:w-full shrink-0 snap-start rounded-2xl overflow-hidden p-4 group transition-all duration-300 transform hover:shadow-md hover:-translate-y-0.5 border border-slate-200/20 focus:outline-none cursor-pointer"
+        class="relative flex flex-col justify-between {card.bg} h-36 sm:h-40 w-[150px] sm:w-full shrink-0 snap-start rounded-2xl overflow-hidden p-4 group transition-all duration-300 transform hover:shadow-md hover:-translate-y-0.5 border border-gray-100 focus:outline-none cursor-pointer"
       >
         <div class="z-10 text-left max-w-[110px] sm:max-w-[140px]">
-          <span class="{card.textColor} text-xs sm:text-base font-extrabold tracking-tight block leading-tight">
+          <span class="{card.textColor} text-[13px] sm:text-[17px] font-extrabold tracking-tight block leading-tight">
             {card.title}
           </span>
-          <span class="text-[9px] sm:text-[10px] text-slate-500/80 font-semibold mt-1 block leading-tight line-clamp-2">
+          <span class="text-[10px] sm:text-[11px] text-gray-500/80 font-semibold mt-1 block leading-tight line-clamp-2">
             {card.sub}
           </span>
         </div>
@@ -89,7 +93,6 @@
       </button>
     {/each}
   </div>
-
 </div>
 
 <style>

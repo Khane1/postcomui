@@ -2,6 +2,8 @@
 <script>
   import { appState } from '$lib/state.svelte.js';
 
+  const ACCENT = '#0aad0a';
+
   // Quick-scroller staples mapped into Instacart filter pill layouts
   const subcategoryBubbles = [
     { 
@@ -73,7 +75,13 @@
   }
 </script>
 
-<section class="space-y-3.5 select-none font-sans">
+<svelte:head>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="true" />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;700;800&display=swap" rel="stylesheet" />
+</svelte:head>
+
+<section class="space-y-3.5 select-none" style="font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;">
   <!-- Dynamic Title Header -->
   <!-- Constraining wrapper to prevent parent flexbox blowout on small screens -->
   <div class="w-full overflow-hidden min-w-0">
@@ -89,11 +97,14 @@
             onclick={() => handleBubbleClick(bubble.query, bubble.category)}
             class="snap-start shrink-0 flex items-center gap-2 px-3.5 py-2 sm:py-1.5 rounded-full transition-all duration-150 border focus:outline-none cursor-pointer group
               {isActive 
-                ? 'bg-[#003d29] text-white border-[#003d29] shadow-xs' 
-                : 'bg-white text-slate-700 border-slate-200 hover:border-[#003d29] hover:bg-slate-50'}"
+                ? 'text-white border-transparent shadow-xs' 
+                : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'}"
+            style="{isActive ? `background: ${ACCENT};` : `border-color: #e5e7eb;`}"
+            onmouseover={(e) => { if (!isActive) e.currentTarget.style.borderColor = ACCENT; }}
+            onmouseout={(e) => { if (!isActive) e.currentTarget.style.borderColor = '#e5e7eb'; }}
           >
             <!-- Miniature Circular Crop Thumbnail -->
-            <div class="w-5 h-5 rounded-full overflow-hidden shrink-0 border bg-slate-50 {isActive ? 'border-white/20' : 'border-slate-100'}">
+            <div class="w-5 h-5 rounded-full overflow-hidden shrink-0 border bg-gray-50 {isActive ? 'border-white/20' : 'border-gray-100'}">
               <img 
                 src={bubble.image} 
                 alt=""
@@ -102,7 +113,7 @@
             </div>
             
             <!-- Pill Text Label -->
-            <span class="text-xs font-bold tracking-tight select-none {isActive ? 'text-white' : 'text-slate-700'}">
+            <span class="text-[12.5px] font-bold tracking-tight select-none {isActive ? 'text-white' : 'text-gray-700'}">
               {bubble.label}
             </span>
           </button>

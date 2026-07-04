@@ -1,301 +1,361 @@
 <!-- routes/account/+page.svelte -->
 <script>
-    import { goto } from "$app/navigation";
-    import { fade } from "svelte/transition";
+    import Header from "$lib/components/templates/settings/header.svelte";
     import { appState } from "$lib/state.svelte.js";
 
-    let inputVal = $state("");
-    let loginMethod = $state("email"); // "email" | "phone"
-    let isLoggedIn = $state(false);
-    let userIdentifier = $state("");
-    let isConnecting = $state(false);
-let inputPhone = $state("");
-    function toggleLoginMethod() {
-        loginMethod = loginMethod === "email" ? "phone" : "email";
-        inputVal = "";
-        inputPhone = "";
+    // Personal information inputs matching split name model
+    let tempFirst = $state("");
+    let tempLast = $state("");
+    let tempMiddle = $state("");
+    let tempEmail = $state("");
+    let tempPhone = $state("");
+
+    // Profile Completion states for GET /customers
+    let dateOfBirth = $state("");
+    let gender = $state("MALE");
+    let marketingPreferences = $state("SMS");
+
+    // Inline edit states
+    let isEditingName = $state(false);
+    let isEditingEmail = $state(false);
+    let isEditingPhone = $state(false);
+    let isEditingCompletion = $state(false);
+
+    let isLoading = $state(false);
+
+   // Initial load sync
+    $effect(() => {
+        if (appState.user) {
+            tempFirst = appState.user.first_name || "";
+            tempLast = appState.user.last_name || "";
+            tempEmail = appState.user.email || "";
+            tempPhone = appState.user.phone_number || "";
+            tempMiddle = appState.user.middle_name === "-" ? "" : (appState.user.middle_name || "");
+            
+            // Populate extended customer onboarding fields if present
+            if (appState.user.date_of_birth) {
+                dateOfBirth = appState.user.date_of_birth.split("T")[0]; // YYYY-MM-DD
+            }
+            if (appState.user.gender) {
+                gender = appState.user.gender;
+            }
+            if (appState.user.marketing_preferences) {
+                marketingPreferences = appState.user.marketing_preferences === 'true' || appState.user.marketing_preferences === true;
+            }
+        }
+    });
+
+    // Save profile details using UpdateProfileInput model
+    async function saveName() {
+        if (!tempFirst.trim() || !tempLast.trim()) {
+            appState.addToast("First and last names cannot be empty.", "error");
+            return;
+        }
+        isLoading = true;
+        const res = await appState.updateProfile({
+            first_name: tempFirst.trim(),
+            last_name: tempLast.trim(),
+            middle_name: tempMiddleName(),
+            phone_number: tempPhone
+        });
+        isLoading = false;
+        if (res.success) {
+            isEditingName = false;
+        }
     }
-    function handleContinue() {
-        if (!inputVal) return;
-        isConnecting = true;
 
-        // Simulate a professional, brief OAuth / verification handshake
-        setTimeout(() => {
-            userIdentifier = inputVal;
-            isConnecting = false;
-            isLoggedIn = true;
-            appState.addToast("Successfully logged in!");
-
-            // Auto follow-through to continue the shopping experience after 1s
-            setTimeout(() => {
-                goto("/");
-            }, 1000);
-        }, 1200);
+    function tempMiddleName() {
+        return tempMiddle.trim() || "-";
     }
 
-    function handleSocialLogin(provider, mockVal) {
-        isConnecting = true;
-        setTimeout(() => {
-            userIdentifier = mockVal;
-            isConnecting = false;
-            isLoggedIn = true;
-            appState.addToast(`Connected with ${provider}!`);
-            setTimeout(() => {
-                goto("/");
-            }, 1000);
-        }, 1000);
+    async function saveEmail() {
+        if (!tempEmail.trim()) return;
+        isLoading = true;
+        const res = await appState.updateProfile({
+            first_name: tempFirst,
+            last_name: tempLast,
+            middle_name: tempMiddleName(),
+            phone_number: tempPhone,
+            email: tempEmail.trim()
+        });
+        isLoading = false;
+        if (res.success) {
+            isEditingEmail = false;
+        }
     }
 
-    function logout() {
-        isLoggedIn = false;
-        inputVal = "";
-        userIdentifier = "";
-        appState.addToast("Logged out safely.", "info");
+    async function savePhone() {
+        if (!tempPhone.trim()) return;
+        isLoading = true;
+        const res = await appState.updateProfile({
+            first_name: tempFirst,
+            last_name: tempLast,
+            middle_name: tempMiddleName(),
+            phone_number: tempPhone.trim()
+        });
+        isLoading = false;
+        if (res.success) {
+            isEditingPhone = false;
+        }
+    }
+
+    // Save extended onboarding inputs using CompleteProfile model
+    async function saveProfileCompletion() {
+        if (!dateOfBirth) {
+            appState.addToast("Please select your date of birth.", "error");
+            return;
+        }
+        isLoading = true;
+        const res = await appState.completeProfile(dateOfBirth, gender, marketingPreferences);
+        isLoading = false;
+        if (res.success) {
+            isEditingCompletion = false;
+        }
     }
 </script>
 
-<div class="max-w-md mx-auto py-12 select-none font-sans px-4">
-    {#if !isLoggedIn}
-        <!-- LOGIN DIALOG (Identical to Screenshot) -->
-        <div
-            class="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-xs space-y-6 relative animate-in fade-in duration-200"
-        >
-            <!-- Top header strip -->
-            <div class="flex items-center justify-between">
-                <!-- Close (X) button routing back to marketplace -->
-               
- <span
-          class="text-lg font-black text-black tracking-tight flex items-center gap-1.5"
-        >
-          <img
-            src="https://postcom.ug/assets/postcom-logo-white-B0oZfjq1.jpg"
-            class="size-10"
-          />
-          <span>postcom</span>
-        </span>
-                <!-- Sign-Up pill on right -->
-                <button
-                    onclick={() =>
-                        handleSocialLogin("Email", "newuser@coop.ug")}
-                    class="bg-slate-100 text-sm font-bold hover:bg-slate-200 text-slate-800  px-4 py-1.5 rounded-full transition-all focus:outline-none cursor-pointer"
-                >
-                    Sign up
-                </button>
-            </div>
+<div class="max-w-2xl text-slate-900 py-6 select-none flex flex-col gap-8">
+    <div class="border-b border-slate-100 pb-4">
+        <Header
+            header={"Account Settings"}
+            description={"Manage your split profile details, contact information, and account preferences."}
+        />
+    </div>
 
-            <!-- Main Heading -->
-            <div class="text-center pt-2">
-                <h3
-                    class="text-base sm:text-lg font-semibold text-slate-800 tracking-tight"
-                >
-                    {#if loginMethod === "phone"}Log in with phone{:else}Log In with Email{/if}
-                </h3>
-                
-            </div>
-
-            <!-- Loading / Connecting overlay state -->
-            {#if isConnecting}
-                <div class="py-10 text-center space-y-2 animate-pulse">
-                    <span class="text-2xl block">⚡</span>
-                    <p class="text-xs font-bold text-slate-500">
-                        Securing connection route...
-                    </p>
+    <!-- PROFILE DETAILS -->
+    <div class="flex flex-col gap-1">
+        <h3 class="text-sm font-semibold text-slate-800 px-1 mb-2">Profile details</h3>
+        
+        <div class="flex flex-col border border-slate-100 rounded-2xl overflow-hidden divide-y divide-slate-100 bg-white">
+            
+            <!-- Split Names Row -->
+            {#if !isEditingName}
+                <div class="w-full flex items-center justify-between p-5 hover:bg-slate-50/50 transition-colors">
+                    <div class="flex flex-col">
+                        <span class="text-[12px] text-slate-400 font-normal">Full name</span>
+                        <span class="text-[15px] font-semibold text-slate-900 mt-0.5">
+                            {appState.displayName}
+                        </span>
+                    </div>
+                    <button 
+                        onclick={() => { isEditingName = true; }} 
+                        class="text-sm font-bold text-[#0aad0a] hover:underline cursor-pointer focus:outline-none"
+                    >
+                        Edit
+                    </button>
                 </div>
             {:else}
-                <!-- Core Form Fields -->
-                <div class="space-y-4">
-                    <!-- Dynamic Input Box -->
-                    <div>
-                        {#if loginMethod === "email"}
-                            <div class="relative" in:fade={{ duration: 100 }}>
-                                <input
-                                    type="email"
-                                    placeholder="Enter your email address"
-                                    bind:value={inputVal}
-                                    class="w-full px-4 py-3 bg-white border border-slate-300 rounded-xl text-sm font-semibold text-slate-800 placeholder-slate-400 focus:border-black focus:border-2 focus:ring-0 focus:outline-none transition-colors"
-                                />
-                            </div>
-                        {:else}
-                            <div class="relative animate-in fade-in duration-100">
-                                <input
-                                    type="tel"
-                                    placeholder="+256 772 123456"
-                                    bind:value={inputPhone}
-                                    class="w-full pl-5 pr-4 py-3 bg-white border border-slate-300 rounded-xl text-sm font-semibold text-slate-800 placeholder-slate-400 focus:border-black focus:border-2 focus:ring-0 focus:outline-none transition-colors"
-                                />
-                            </div>
-                        {/if}
+                <div class="w-full flex flex-col gap-4 p-5 bg-slate-50/30">
+                    <div class="grid grid-cols-3 gap-3">
+                        <div class="border border-slate-300 focus-within:border-[#1a1a1a] focus-within:ring-1 focus-within:ring-[#1a1a1a] bg-white rounded-[14px] px-4 pt-2 pb-2.5 flex flex-col transition-shadow">
+                            <label class="text-[11px] text-neutral-500 font-normal select-none mb-0.5">First name</label>
+                            <input 
+                                type="text" 
+                                bind:value={tempFirst} 
+                                disabled={isLoading}
+                                class="outline-none text-[15px] text-[#333] bg-transparent w-full p-0 border-0 focus:ring-0 leading-normal"
+                            />
+                        </div>
+
+                        <div class="border border-slate-300 focus-within:border-[#1a1a1a] focus-within:ring-1 focus-within:ring-[#1a1a1a] bg-white rounded-[14px] px-4 pt-2 pb-2.5 flex flex-col transition-shadow">
+                            <label class="text-[11px] text-neutral-500 font-normal select-none mb-0.5">Middle name</label>
+                            <input 
+                                type="text" 
+                                bind:value={tempMiddle} 
+                                placeholder="Optional"
+                                disabled={isLoading}
+                                class="outline-none text-[15px] text-[#333] bg-transparent w-full p-0 border-0 focus:ring-0 leading-normal"
+                            />
+                        </div>
+
+                        <div class="border border-slate-300 focus-within:border-[#1a1a1a] focus-within:ring-1 focus-within:ring-[#1a1a1a] bg-white rounded-[14px] px-4 pt-2 pb-2.5 flex flex-col transition-shadow">
+                            <label class="text-[11px] text-neutral-500 font-normal select-none mb-0.5">Last name</label>
+                            <input 
+                                type="text" 
+                                bind:value={tempLast} 
+                                disabled={isLoading}
+                                class="outline-none text-[15px] text-[#333] bg-transparent w-full p-0 border-0 focus:ring-0 leading-normal"
+                            />
+                        </div>
                     </div>
-
-                    <!-- Instacart Signature Green Action Button -->
-                    <button
-                        onclick={handleContinue}
-                        disabled={(!inputVal && loginMethod === "email") ||
-                            (loginMethod === "phone" && !inputPhone)}
-                        class="w-full bg-red-500 hover:bg-red-700 disabled:bg-slate-100 disabled:text-slate-400 text-white font-extrabold text-sm h-12 rounded-full transition-all focus:outline-none flex items-center justify-center shadow-xs cursor-pointer"
-                    >
-                        Continue
-                    </button>
-
-                    <!-- Divider -->
-                    <div
-                        class="flex items-center justify-center gap-3 py-2 select-none"
-                    >
-                        <div class="h-px bg-slate-200 flex-1"></div>
-                        <span
-                            class="text-[10px] font-bold text-slate-400 uppercase tracking-wider"
-                            >Or continue with</span
+                    <div class="flex justify-end gap-3 shrink-0">
+                        <button 
+                            onclick={() => { 
+                                isEditingName = false; 
+                                tempFirst = appState.user?.first_name || ""; 
+                                tempLast = appState.user?.last_name || "";
+                                tempMiddle = appState.user?.middle_name === "-" ? "" : (appState.user?.middle_name || "");
+                            }} 
+                            disabled={isLoading}
+                            class="text-xs font-semibold text-slate-400 hover:text-slate-600 focus:outline-none"
                         >
-                        <div class="h-px bg-slate-200 flex-1"></div>
-                    </div>
-
-                    <!-- Social Buttons Pill Bar -->
-                    <div
-                        class="flex  flex-wrap items-center justify-center gap-2"
-                    >
-                        <!-- Google -->
-                        <button
-                            onclick={() =>
-                                handleSocialLogin(
-                                    "Google",
-                                    "user.google@gmail.com",
-                                )}
-                            class="bg-slate-100 text-xs font-bold hover:bg-slate-200 text-slate-800 t font-semi px-3.5 py-2.5 rounded-full flex items-center gap-2 transition-all focus:outline-none cursor-pointer"
-                        >
-                            <svg  viewBox="0 0 24 24">
-                                <img class="w-3.5 h-3.5 rounded-full" src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ2sSeQqjaUTuZ3gRgkKjidpaipF_l6s72lBw&s" alt="">
-                            </svg>
-                            <span>Google</span>
+                            Cancel
                         </button>
-
-                        <!-- Facebook -->
-                        <button
-                            onclick={() =>
-                                handleSocialLogin(
-                                    "Facebook",
-                                    "user.facebook@fb.com",
-                                )}
-                            class="bg-slate-100 hover:bg-slate-200 text-slate-800 text-[11px] font-extrabold px-3.5 py-2.5 rounded-full flex items-center gap-2 transition-all focus:outline-none cursor-pointer"
-                        >
-                            <svg
-                                class="w-3.5 h-3.5"
-                                fill="currentColor"
-                                viewBox="0 0 24 24"
-                            >
-                                <path
-                                    d="M22 12c0-5.52-4.48-10-10-10S2 6.48 2 12c0 4.84 3.44 8.87 8 9.8V15H8v-3h2V9.5C10 7.57 11.57 6 13.5 6H16v3h-2c-.55 0-1 .45-1 1V12h3v3h-3v6.8c4.56-.93 8-4.96 8-9.8Z"
-                                />
-                            </svg>
-                            <span>Facebook</span>
-                        </button>
-
-                        <!-- Toggle Phone Input -->
-                        <button
-                            onclick={toggleLoginMethod}
-                            class="bg-slate-100 hover:bg-slate-200 text-slate-800 text-[11px] font-extrabold px-3.5 py-2.5 rounded-full flex items-center gap-2 transition-all focus:outline-none cursor-pointer"
-                        >
-                            <svg
-                                class="w-3.5 h-3.5"
-                                fill="none"
-                                stroke="currentColor"
-                                stroke-width="2.5"
-                                viewBox="0 0 24 24"
-                            >
-                                <path
-                                    stroke-linecap="round"
-                                    stroke-linejoin="round"
-                                    d="M10.5 1.5H8.25A2.25 2.25 0 0 0 6 3.75v16.5a2.25 2.25 0 0 0 2.25 2.25h7.5A2.25 2.25 0 0 0 18 20.25V3.75a2.25 2.25 0 0 0-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3"
-                                />
-                            </svg>
-                            <span
-                                >{#if loginMethod === "email"}Phone{:else}Email{/if}</span
-                            >
+                        <button onclick={saveName} disabled={isLoading} class="text-xs font-bold text-[#0aad0a] hover:underline focus:outline-none">
+                            Save Name Changes
                         </button>
                     </div>
                 </div>
             {/if}
+
+            <!-- Email Address Row -->
+            {#if !isEditingEmail}
+                <div class="w-full flex items-center justify-between p-5 hover:bg-slate-50/50 transition-colors">
+                    <div class="flex flex-col">
+                        <span class="text-[12px] text-slate-400 font-normal">Email address</span>
+                        <span class="text-[15px] font-semibold text-slate-900 mt-0.5">{tempEmail || "Not Configured"}</span>
+                    </div>
+                    <button 
+                        onclick={() => { isEditingEmail = true; }} 
+                        class="text-sm font-bold text-[#0aad0a] hover:underline cursor-pointer focus:outline-none"
+                    >
+                        Edit
+                    </button>
+                </div>
+            {:else}
+                <div class="w-full flex items-center justify-between p-5 bg-slate-50/30">
+                    <div class="flex-1 max-w-md">
+                        <div class="border border-slate-300 focus-within:border-[#1a1a1a] focus-within:ring-1 focus-within:ring-[#1a1a1a] bg-white rounded-[14px] px-4 pt-2 pb-2.5 flex flex-col transition-shadow">
+                            <label class="text-[11px] text-neutral-500 font-normal select-none mb-0.5">Email address</label>
+                            <input 
+                                type="email" 
+                                bind:value={tempEmail} 
+                                disabled={isLoading}
+                                class="outline-none text-[15px] text-[#333] bg-transparent w-full p-0 border-0 focus:ring-0 leading-normal"
+                            />
+                        </div>
+                    </div>
+                    <div class="flex gap-4 ml-4 shrink-0">
+                        <button onclick={saveEmail} disabled={isLoading} class="text-sm font-bold text-[#0aad0a] hover:underline cursor-pointer focus:outline-none">
+                            Save
+                        </button>
+                        <button 
+                            onclick={() => { isEditingEmail = false; tempEmail = appState.user?.email || ""; }} 
+                            disabled={isLoading}
+                            class="text-sm font-semibold text-slate-400 hover:text-slate-600 cursor-pointer focus:outline-none"
+                        >
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            {/if}
+
+            <!-- Phone Number Row -->
+            {#if !isEditingPhone}
+                <div class="w-full flex items-center justify-between p-5 hover:bg-slate-50/50 transition-colors">
+                    <div class="flex flex-col">
+                        <span class="text-[12px] text-slate-400 font-normal">Phone number</span>
+                        <span class="text-[15px] font-semibold text-slate-900 mt-0.5">{tempPhone || "Not Configured"}</span>
+                    </div>
+                    <button 
+                        onclick={() => { isEditingPhone = true; }} 
+                        class="text-sm font-bold text-[#0aad0a] hover:underline cursor-pointer focus:outline-none"
+                    >
+                        Edit
+                    </button>
+                </div>
+            {:else}
+                <div class="w-full flex items-center justify-between p-5 bg-slate-50/30">
+                    <div class="flex-1 max-w-md">
+                        <div class="border border-slate-300 focus-within:border-[#1a1a1a] focus-within:ring-1 focus-within:ring-[#1a1a1a] bg-white rounded-[14px] px-4 pt-2 pb-2.5 flex flex-col transition-shadow">
+                            <label class="text-[11px] text-neutral-500 font-normal select-none mb-0.5">Phone number</label>
+                            <input 
+                                type="text" 
+                                bind:value={tempPhone} 
+                                disabled={isLoading}
+                                class="outline-none text-[15px] text-[#333] bg-transparent w-full p-0 border-0 focus:ring-0 leading-normal"
+                            />
+                        </div>
+                    </div>
+                    <div class="flex gap-4 ml-4 shrink-0">
+                        <button onclick={savePhone} disabled={isLoading} class="text-sm font-bold text-[#0aad0a] hover:underline cursor-pointer focus:outline-none">
+                            Save
+                        </button>
+                        <button 
+                            onclick={() => { isEditingPhone = false; tempPhone = appState.user?.phone_number || ""; }} 
+                            disabled={isLoading}
+                            class="text-sm font-semibold text-slate-400 hover:text-slate-600 cursor-pointer focus:outline-none"
+                        >
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            {/if}
+
         </div>
-    {:else}
-        <!-- USER PROFILE VIEWPORT (Instacart Style Dashboard) -->
-        <div class="space-y-6 animate-in fade-in duration-200">
-            <div
-                class="border border-slate-200 rounded-3xl p-6 bg-white space-y-5 shadow-xs"
-            >
-                <!-- User Header Details -->
-                <div
-                    class="flex items-center gap-3 border-b border-slate-100 pb-4"
-                >
-                    <div
-                        class="w-12 h-12 rounded-full bg-emerald-50 text-emerald-700 flex items-center justify-center text-lg shadow-xs font-bold border border-emerald-100"
-                    >
-                        👤
-                    </div>
-                    <div>
-                        <h3
-                            class="text-sm font-black text-slate-900 truncate max-w-[180px]"
-                        >
-                            {userIdentifier}
-                        </h3>
-                        <span
-                            class="text-[9px] font-black text-[#003d29] bg-emerald-50 px-2 py-0.5 rounded uppercase tracking-wider"
-                            >Postcom Buyer</span
-                        >
-                    </div>
-                </div>
+    </div>
 
-                <!-- System Preferences -->
-                <div class="space-y-3 text-xs font-medium text-slate-600">
-                    <div
-                        class="flex justify-between items-center border-b border-slate-50 pb-2.5"
-                    >
-                        <span class="text-slate-400">Postal Branch</span>
-                        <span class="text-slate-800 font-extrabold"
-                            >{appState.activeBranch}</span
-                        >
-                    </div>
-                    <div
-                        class="flex justify-between items-center border-b border-slate-50 pb-2.5"
-                    >
-                        <span class="text-slate-400">Active Cart Items</span>
-                        <span class="text-slate-800 font-extrabold"
-                            >{appState.cartCount} items</span
-                        >
-                    </div>
-                    <div
-                        class="flex justify-between items-center border-b border-slate-50 pb-2.5"
-                    >
-                        <span class="text-slate-400"
-                            >Sustainable Sourcing Level</span
-                        >
-                        <span
-                            class="text-emerald-700 font-black flex items-center gap-0.5"
-                            >🌱 Level 1</span
-                        >
-                    </div>
-                </div>
+    <!-- ONBOARDING COMPLETION SECTION (Only displays contextually if is_complete is false) -->
+    <div class="flex flex-col gap-1 pt-2">
+        <div class="flex justify-between items-baseline px-1">
+            <h3 class="text-sm font-semibold text-slate-800 mb-2">Onboarding Completion</h3>
+            {#if appState.user?.is_complete}
+                <span class="text-[10px] font-black text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded uppercase tracking-wider">
+                    Completed Profile ✓
+                </span>
+            {:else}
+                <span class="text-[10px] font-black text-amber-700 bg-amber-50 border border-amber-100 px-2 py-0.5 rounded uppercase tracking-wider">
+                    Pending Completion
+                </span>
+            {/if}
+        </div>
 
-                <!-- Follow-through Shopping Redirection Block -->
-                <div
-                    class="bg-emerald-50 border border-emerald-100/50 p-4 rounded-2xl text-center space-y-1"
-                >
-                    <p class="text-xs font-bold text-emerald-900 leading-snug">
-                        Connecting to regional markets...
-                    </p>
-                    <a
-                        href="/"
-                        class="text-xs font-black text-emerald-700 hover:underline block"
-                        >Settle co-op deals immediately →</a
-                    >
-                </div>
+        {#if !appState.user?.is_complete}
+            <div class="border border-amber-100 bg-amber-50/30 rounded-2xl p-5 space-y-4">
+                <p class="text-xs text-slate-600 leading-relaxed font-light">
+                    Your customer profile is incomplete. Provide these extra parameters to unlock regional postal rewards and cashbacks.
+                </p>
 
-                <!-- Minimal Log-Out -->
-                <button
-                    onclick={logout}
-                    class="w-full border border-slate-200 hover:border-red-200 text-slate-500 hover:text-red-600 font-bold text-xs h-10 rounded-full transition-all focus:outline-none flex items-center justify-center gap-2 bg-white cursor-pointer"
-                >
-                    Logout Safely
-                </button>
+                <div class="flex flex-col gap-4">
+                    <!-- Date of birth input -->
+                    <div class="border border-slate-300 focus-within:border-[#1a1a1a] focus-within:ring-1 focus-within:ring-[#1a1a1a] bg-white rounded-[14px] px-4 pt-2.5 pb-3 flex flex-col">
+                        <label class="text-[11px] text-neutral-500 font-normal select-none mb-0.5">Date of Birth</label>
+                        <input 
+                            type="date" 
+                            bind:value={dateOfBirth} 
+                            disabled={isLoading}
+                            class="outline-none text-[14px] text-[#333] bg-transparent w-full p-0 border-0 focus:ring-0 leading-normal"
+                        />
+                    </div>
+
+                    <!-- Gender selection -->
+                    <div class="space-y-1 px-1">
+                        <span class="text-[11px] text-neutral-500 font-normal">Gender Identity</span>
+                        <div class="flex gap-4 pt-1">
+                            <label class="inline-flex items-center gap-2 text-xs font-semibold text-slate-700">
+                                <input type="radio" bind:group={gender} value="MALE" class="text-red-500 focus:ring-red-500" />
+                                <span>Male</span>
+                            </label>
+                            <label class="inline-flex items-center gap-2 text-xs font-semibold text-slate-700">
+                                <input type="radio" bind:group={gender} value="FEMALE" class="text-red-500 focus:ring-red-500" />
+                                <span>Female</span>
+                            </label>
+                        </div>
+                    </div>
+
+                   <!-- Marketing channel checkbox -->
+                    <div class="flex items-center gap-3.5 px-2 py-3 select-none">
+                        <input 
+                            type="checkbox" 
+                            id="marketing-opt-in"
+                            bind:checked={marketingPreferences} 
+                            disabled={isLoading}
+                            class="rounded border-slate-300 text-rose-500 focus:ring-rose-500 h-5 w-5 cursor-pointer shrink-0"
+                        />
+                        <label for="marketing-opt-in" class="text-xs font-semibold text-slate-700 cursor-pointer leading-normal">
+                            I agree to receive promotional updates, mobile wallet cashback alerts.
+                        </label>
+                    </div>
+
+                    <button 
+                        onclick={saveProfileCompletion}
+                        disabled={isLoading || !dateOfBirth}
+                        class="bg-slate-900 hover:bg-slate-800 disabled:bg-slate-200 text-white font-bold text-xs h-10 px-6 rounded-full transition-colors w-fit focus:outline-none"
+                    >
+                        {#if isLoading}Processing...{:else}Complete Account{/if}
+                    </button>
+                </div>
             </div>
-        </div>
-    {/if}
+        {/if}
+    </div>
 </div>

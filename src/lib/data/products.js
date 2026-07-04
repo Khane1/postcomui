@@ -291,6 +291,7 @@ export const products = [
     process: "Natural Dried",
     description: "Fine robusta coffee known globally for its intense body and chocolate-malt undertones. Grown by sustainable smallholder farms in Kibinge.",
     images: [
+      "/busogacoffe.png",
       "https://firstcrackcoffee.me/cdn/shop/files/UgandaRobusta18Bag_533x.jpg?v=1778143718",
       "https://images.unsplash.com/photo-1447933601403-0c6688de566e?w=600&q=80"
     ],

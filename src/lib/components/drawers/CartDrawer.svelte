@@ -2,10 +2,11 @@
 <script>
     import { appState } from "$lib/state.svelte.js";
     import { products } from "$lib/data/products.js";
-    import ProductCard from "./ProductCard.svelte";
+    import ProductCard from "../cards&grids/ProductCard.svelte";
     import { fly, fade } from "svelte/transition";
     import { cubicOut } from "svelte/easing";
     import { goto } from "$app/navigation";
+
     let subtotal = $derived(
         appState.cartItems.reduce(
             (acc, item) => acc + item.product.price * item.quantity,
@@ -13,9 +14,9 @@
         ),
     );
 
-    // Cross-sell items: Filter out what is already in the cart
+    // Cross-sell items: Reads from API list if loaded, otherwise falls back to local mocks
     let crossSellProducts = $derived(
-        products
+        (appState.allProducts.length > 0 ? appState.allProducts : products)
             .filter(
                 (p) =>
                     !appState.cartItems.some(
@@ -31,8 +32,8 @@
 
     function handleCheckoutTrigger() {
         appState.isCartOpen = false;
-        appState.isCheckoutOpen = true; // Seamless modal overlay transition
-        goto('/cart')
+        appState.isCheckoutOpen = true;
+        goto("/cart");
     }
 
     function handleIncrement(item) {
@@ -48,20 +49,15 @@
             );
         }
     }
+
     function handleProductRedirect(product) {
         appState.selectedProductForModal = product;
     }
+
     function handleFavoriteToggle(id) {
-        if (crossSellProducts[id]) {
-            delete crossSellProducts[id];
-            appState.favoritesCount -= 1;
-            appState.addToast("Removed item from Favorites", "info");
-        } else {
-            crossSellProducts[id] = true;
-            appState.favoritesCount += 1;
-            appState.addToast("Saved item to Favorites");
-        }
+        appState.toggleFavorite(id); // Use core state toggler [5]
     }
+
     function handleAddToCart(product) {
         const existing = appState.cartItems.find(
             (item) => item.product.id === product.id,
@@ -77,11 +73,11 @@
         }
         appState.addToast(`Added ${product.name} to basket`);
     }
+
     let today = new Date();
     let targetDate = new Date();
     targetDate.setDate(targetDate.getDate() + 3);
 
-    // Helper function to append st, nd, rd, or th
     function getOrdinalSuffix(day) {
         if (day > 3 && day < 21) return "th";
         switch (day % 10) {
@@ -96,23 +92,15 @@
         }
     }
 
-    // Get weekday and month names: "Saturday June"
     let baseDateStr = targetDate.toLocaleDateString("en-US", {
         weekday: "long",
     });
-    let month = targetDate.toLocaleDateString("en-US", {
-        month: "long",
-    });
-
-    // Get day number: 20
+    let month = targetDate.toLocaleDateString("en-US", { month: "long" });
     let dayNum = targetDate.getDate();
-
-    // Combine into final string: "Saturday June 20th"
     let formattedDate = `${baseDateStr} ${dayNum}${getOrdinalSuffix(dayNum)} ${month} ${targetDate.getFullYear()}`;
 </script>
 
 {#if appState.isCartOpen}
-    <!-- Backdrop Overlay -->
     <button
         onclick={close}
         transition:fade={{ duration: 150 }}
@@ -120,12 +108,10 @@
         aria-label="Close cart"
     ></button>
 
-    <!-- Slide-Out Drawer (Right-to-Left transition) -->
     <aside
         transition:fly={{ x: 440, duration: 300, easing: cubicOut }}
         class="fixed inset-y-0 right-0 z-[90] w-full sm:w-[440px] bg-white shadow-2xl border-l border-slate-200/50 flex flex-col justify-between font-sans select-none"
     >
-        <!-- Header Block -->
         <div
             class="p-4 border-b border-slate-100 flex items-center justify-between shrink-0"
         >
@@ -158,12 +144,9 @@
                 </p>
             </div>
             <div class="w-7"></div>
-            <!-- Spacer balance -->
         </div>
 
-        <!-- Scrollable Items Area -->
         <div class="flex-1 overflow-y-auto p-5 space-y-6">
-            <!-- Store Segment Header -->
             <div
                 class="flex items-center justify-between border-b border-slate-100 pb-3"
             >
@@ -172,7 +155,7 @@
                         Delivery Timeline
                     </h4>
                     <span
-                        class="text-sm text-emerald-600 font- flex items-center gap-1 mt-0.5"
+                        class="text-sm text-emerald-600 flex items-center gap-1 mt-0.5"
                     >
                         ⚡ Delivery by {formattedDate}
                     </span>
@@ -180,31 +163,43 @@
             </div>
 
             {#if appState.cartItems.length === 0}
-                <div class="text-center py-20 space-y-4 max-w-md mx-auto">
+                <div
+                    class="text-center py-20 space-y-4 max-w-md mx-auto"
+                    style="font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;"
+                >
                     <div
-                        class="w-16 h-16 bg-slate-50 border border-slate-100 rounded-full flex items-center justify-center mx-auto text-3xl"
+                        class="w-16 h-16 bg-gray-50 border border-gray-100 rounded-full flex items-center justify-center mx-auto text-gray-400"
                     >
-                        🧺
+                        <svg
+                            class="w-8 h-8"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.8"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                d="M15.75 10.5V6a3.75 3.75 0 1 0-7.5 0v4.5m11.356-1.993 1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 0 1-1.12-1.243l1.264-12A1.125 1.125 0 0 1 5.513 7.5h12.974c.576 0 1.059.435 1.119 1.007ZM8.625 10.5a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm7.5 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z"
+                            />
+                        </svg>
                     </div>
                     <div class="space-y-1">
-                        <h2 class="text-base text-slate-800 tracking-tight">
-                            Your basket is empty!
-                        </h2>
-                        <p
-                            class="text-xs text-slate-500 leading-relaxed font-semibold"
-                        ></p>
-                    </div>
-                    <button onclick={close}>
-                        <a
-                            href="/"
-                            class="inline-block bg-[#0aad0a] hover:bg-[#099409] text-white text-xs font-black px-6 py-2.5 rounded-full transition-all"
+                        <h2
+                            class="text-[15px] text-gray-900 tracking-tight font-extrabold"
                         >
-                            Continue Shopping
-                        </a>
-                    </button>
+                            Your basket is empty
+                        </h2>
+                    </div>
+                    <a
+                        href="/"
+                        onclick={close}
+                        class="inline-block bg-[#0aad0a] hover:bg-[#099409] text-white text-[13px] font-bold px-6 py-2.5 rounded-full transition-all"
+                    >
+                        Continue shopping
+                    </a>
                 </div>
             {:else}
-                <!-- Cart Items List -->
                 <div class="space-y-4">
                     {#each appState.cartItems as item (item.product.id)}
                         <div
@@ -212,7 +207,7 @@
                         >
                             <div class="flex items-center gap-3.5 min-w-0">
                                 <div
-                                    class=" flex items-center justify-center shrink-0"
+                                    class="flex items-center justify-center shrink-0"
                                 >
                                     <img
                                         src={item.product.images[0]}
@@ -222,7 +217,7 @@
                                 </div>
                                 <div class="min-w-0">
                                     <h5
-                                        class=" text-sm text-slate-900 leading-snug line-clamp-3 max-w-[160px] sm:max-w-[200px]"
+                                        class="text-sm text-slate-900 leading-snug line-clamp-3 max-w-[160px] sm:max-w-[200px]"
                                     >
                                         {item.product.name}
                                     </h5>
@@ -236,7 +231,6 @@
                                 </div>
                             </div>
 
-                            <!-- Price & Custom Stepper Group -->
                             <div class="flex items-center gap-3 shrink-0">
                                 <div
                                     class="flex items-center border border-slate-200/80 rounded-full h-7 bg-slate-50/50 select-none"
@@ -244,21 +238,20 @@
                                     <button
                                         onclick={() => handleDecrement(item)}
                                         class="{item.quantity > 1
-                                            ? ' w-8 text-[#0aad0a]  '
+                                            ? 'w-8 text-[#0aad0a]'
                                             : 'w-8 text-red-500 px-1.5'} hover:bg-slate-100 h-6 rounded-l-full flex items-center justify-center font-semibold text-xl focus:outline-none"
                                     >
-                                        {#if item.quantity == 1}
+                                        {#if item.quantity === 1}
                                             <svg
                                                 xmlns="http://www.w3.org/2000/svg"
-                                                x="0px"
-                                                y="0px"
                                                 width="100"
                                                 height="100"
                                                 viewBox="0 0 30 30"
+                                                class="w-4 h-4 fill-current"
                                             >
                                                 <path
                                                     d="M 14.984375 2.4863281 A 1.0001 1.0001 0 0 0 14 3.5 L 14 4 L 8.5 4 A 1.0001 1.0001 0 0 0 7.4863281 5 L 6 5 A 1.0001 1.0001 0 1 0 6 7 L 24 7 A 1.0001 1.0001 0 1 0 24 5 L 22.513672 5 A 1.0001 1.0001 0 0 0 21.5 4 L 16 4 L 16 3.5 A 1.0001 1.0001 0 0 0 14.984375 2.4863281 z M 6 9 L 7.7929688 24.234375 C 7.9109687 25.241375 8.7633438 26 9.7773438 26 L 20.222656 26 C 21.236656 26 22.088031 25.241375 22.207031 24.234375 L 24 9 L 6 9 z"
-                                                ></path>
+                                                />
                                             </svg>
                                         {:else}
                                             −
@@ -279,10 +272,8 @@
                 </div>
             {/if}
 
-            <!-- Suggested items Row (Matching Screenshot) -->
             {#if crossSellProducts.length > 0}
                 <div class="space-y-4 pt-6 border-t border-slate-100">
-                    <!-- Section Banner Header -->
                     <div
                         class="bg-slate-50 border-y border-slate-200/40 -mx-5 px-5 py-2 select-none"
                     >
@@ -293,14 +284,15 @@
                         </h4>
                     </div>
 
-                    <!-- Horizontal Swipe Carousel -->
                     <div
                         class="flex gap-4 overflow-x-auto pb-4 scrollbar-none snap-x -mx-5 px-5 sm:mx-0 sm:px-0 grid grid-cols-2"
                     >
-                        {#each crossSellProducts as product, idx}
+                        {#each crossSellProducts as product (product.id)}
                             <ProductCard
                                 {product}
-                                isFavorited={!!crossSellProducts[product.id]}
+                                isFavorited={appState.favorites.includes(
+                                    product.id,
+                                )}
                                 onCardClick={handleProductRedirect}
                                 onToggleFavorite={handleFavoriteToggle}
                                 onAddToCart={handleAddToCart}
@@ -311,7 +303,6 @@
             {/if}
         </div>
 
-        <!-- Sticky Checkout Footer Bar (Instacart style) -->
         <div
             class="p-5 border-t border-slate-100 bg-slate-50/50 shrink-0 space-y-4"
         >

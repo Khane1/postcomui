@@ -1,54 +1,150 @@
+<!-- routes/+layout.svelte -->
 <script>
   import "./layout.css";
   import { page } from "$app/state";
   import { goto } from "$app/navigation";
   import { appState } from "$lib/state.svelte.js";
-  import SidebarNav from "$lib/components/SidebarNav.svelte";
-  import ProductDetailModal from "$lib/components/ProductDetailModal.svelte";
-    import CartDrawer from "$lib/components/CartDrawer.svelte";
+  import SidebarNav from "$lib/components/sidebars/SidebarNav.svelte";
+  import ProductDetailModal from "$lib/components/modals/ProductDetailModal.svelte";
+  import CartDrawer from "$lib/components/drawers/CartDrawer.svelte";
+  import { onMount } from "svelte";
+  import AccountSidebarNav from "$lib/components/sidebars/AccountSidebarNav.svelte";
+  import Locationselection from "$lib/components/modals/locationselection.svelte";
 
   let { children } = $props();
 
-  const branches = [
-    "Kampala GPO",
-    "Entebbe Post Office",
-    "Jinja Post Office",
-    "Mbarara Post Office",
-    "Gulu Post Office",
-    "Mbale Post Office",
-  ];
+  // Search input & suggestion states
+  let locationSearchQuery = $state("");
+  let isLocating = $state(false);
+  let placeSuggestions = $state([]); // Google Maps places predictions array
+  let resolvedUserAddress = $state(""); // Reverse geocoded location address
+  let tempSelectedAddress = $state(""); // Tracks active address before confirming save
+
+  // NEW: Address book fields state
+  let saveToAddressBook = $state(false);
+  let aptInput = $state("");
+  let businessInput = $state("");
+  let commentsInput = $state("");
+  let isSavingAddress = $state(false);
+
+  const GOOGLE_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "";
+
+  // NEW: Detail fields state & maps coordinate markers
+
+  let selectedLat = $state(0.3476); // Default Kampala coordinates
+  let selectedLng = $state(32.5825);
+
+  // Request browser GPS position [6]
+  function requestCustomerLocationOnOpen() {
+    if (!navigator.geolocation) {
+      appState.addToast(
+        "Geolocation is not supported by your browser.",
+        "error",
+      );
+      return;
+    }
+
+    isLocating = true;
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        selectedLat = latitude;
+        selectedLng = longitude;
+        await reverseGeocodeAddress(latitude, longitude);
+        isLocating = false;
+      },
+      () => {
+        isLocating = false;
+        appState.addToast(
+          "Permission denied or location lookup failed.",
+          "error",
+        );
+      },
+      { enableHighAccuracy: true, timeout: 5000 },
+    );
+  }
+
+  // Resolve typed/searched suggestions to exact coordinates using Geocoder [3]
+ 
+  onMount(() => {
+    appState.initAuth();
+    loadGoogleMapsScript();
+  });
+
+  // Dynamically load Google Maps Places Library [3]
+  function loadGoogleMapsScript() {
+    if (typeof window === "undefined" || window.google) return;
+    const script = document.createElement("script");
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_API_KEY}&libraries=places`;
+    script.async = true;
+    script.defer = true;
+    document.head.appendChild(script);
+  }
+
+  // Google Maps autocomplete suggestions lookup
+  
+
+  let isAccountProfile = $derived(
+    page.url.pathname.startsWith("/account") && appState.isLoggedIn,
+  );
+
+  let mainClass = $derived.by(() => {
+    if (isAccountProfile) {
+      return "flex-1 min-w-0 bg-white rounded-tl-3xl border-t border-l border-slate-100/5 flex";
+    }
+    return "flex-1 min-w-0 p-4 sm:p-6 bg-white rounded-tl-3xl border-t border-l border-slate-100/5 2xl:px-20";
+  });
+
+  $effect(() => {
+    if (typeof window !== "undefined") {
+      const handleAuthFailure = () => {
+        appState.addToast("Session expired. Please log in again.", "info");
+        goto("/account");
+      };
+      window.addEventListener("unauthorized-session", handleAuthFailure);
+      return () =>
+        window.removeEventListener("unauthorized-session", handleAuthFailure);
+    }
+  });
 
   function updateFulfillment(mode) {
     appState.fulfillmentMode = mode;
   }
 
+  // Handle product searches via header form
   function handleSearchSubmit(e) {
     e.preventDefault();
+    appState.fetchProducts();
     goto("/products");
   }
 
   function updateCategory(cat) {
     appState.selectedCategory = cat;
+    appState.fetchProducts();
     goto("/products");
   }
 
   function handleClaimCoupon(coupon) {
     appState.addToast(`Coupon "${coupon}" successfully applied!`);
   }
+  const ACCENT = '#0aad0a';
 </script>
 
 <ProductDetailModal />
 <CartDrawer />
-<div class="min-h-screen bg-white font-sans text-slate-800 flex flex-col">
-  <!-- SINGLE ROW MODERN MAIN HEADER -->
+
+<div class="min-h-screen bg-white text-gray-800 flex flex-col" style="font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;">
   <header
-    class="bg-white border-b border-slate-200/60 px-4 sm:px-6 py-3.5 flex items-center justify-between gap-4 select-none sticky top-0 z-50"
+    class="bg-white border-b border-gray-200 px-4 sm:px-6 py-3.5 flex items-center justify-between gap-4 select-none sticky top-0 z-50"
   >
-    <!-- Left Logo & Address Dropdown Segment -->
     <div class="flex items-center gap-5 shrink-0">
       <button
-        onclick={() => (appState.isSidebarOpen = !appState.isSidebarOpen)}
-        class="lg:hidden text-slate-800 hover:text-slate-900 focus:outline-none p-1.5 hover:bg-slate-200/50 rounded-lg transition-all"
+        onclick={() => {
+          !isAccountProfile
+            ? (appState.isSidebarOpen = !appState.isSidebarOpen)
+            : (appState.accountSidebarOpen = !appState.accountSidebarOpen);
+        }}
+        class="lg:hidden text-gray-800 hover:text-gray-900 focus:outline-none p-1.5 hover:bg-gray-100 rounded-lg transition-all"
         aria-label="Menu"
       >
         <svg
@@ -65,41 +161,39 @@
           />
         </svg>
       </button>
-
-      <!-- Brand Logo Custom Leaf Accent -->
+ 
       <a
         href="/"
-        class="flex items-center gap-1 group focus:outline-none text-left"
+        class="flex items-center gap-1.5 group focus:outline-none text-left"
       >
-        <span
-          class="text-lg font-black text-[#2b2b2b] tracking-tight flex items-center gap-1.5"
-        >
-          <img
-            src="https://postcom.ug/assets/postcom-logo-white-B0oZfjq1.jpg"
-            class="size-10"
-          />
-          <span>postcom</span>
+        <img
+          src="https://postcom.ug/assets/postcom-logo-white-B0oZfjq1.jpg"
+          class="size-9 rounded-lg"
+          alt="Logo"
+        />
+        <span class="text-[19px] font-extrabold text-gray-900 tracking-tight">
+          postcom
         </span>
       </a>
-
-      <!-- Address Dropdown -->
+ 
       <button
         onclick={() => (appState.isLocationModalOpen = true)}
-        class="hidden sm:flex items-center gap-1.5 bg-[#F1EFE9] border border-transparent hover:border-slate-300 px-3 py-1.5 rounded-full text-xs font-bold text-slate-700 transition-all focus:outline-none cursor-pointer"
+        class="hidden sm:flex items-center gap-1.5 bg-gray-100 border border-transparent hover:border-gray-300 px-3.5 py-1.5 rounded-full text-[12.5px] font-bold text-gray-700 transition-all focus:outline-none cursor-pointer"
       >
-        <span class="text-[13px] leading-none">📍</span>
-        <span class="truncate max-w-[140px]">{appState.activeBranch}</span>
-        <span class="text-slate-400 text-[10px]">▼</span>
+        <span class="text-[13px] leading-none">UG</span>
+        <span class="truncate max-w-[140px]"
+          >{appState.activeBranch || "Set delivery address"}</span
+        >
+        <span class="text-gray-400 text-[10px]">▼</span>
       </button>
     </div>
-
-    <!-- Centered Rounded Search Bar -->
+ 
     <form onsubmit={handleSearchSubmit} class="flex-1 max-w-lg hidden md:block">
       <div
-        class="flex items-center bg-[#F1EFE9]/60 border border-transparent rounded-full px-4 py-2 transition-all focus-within:bg-white focus-within:border-[#003d29] focus-within:shadow-[0_0_0_3px_rgba(0,61,41,0.06)]"
+        class="flex items-center bg-gray-100 border border-transparent rounded-full px-4 py-2.5 transition-all focus-within:bg-white focus-within:border-[#0aad0a] focus-within:shadow-[0_0_0_3px_rgba(10,173,10,0.08)]"
       >
         <svg
-          class="w-4 h-4 text-slate-400 mr-2.5 shrink-0"
+          class="w-4 h-4 text-gray-400 mr-2.5 shrink-0"
           fill="none"
           stroke="currentColor"
           stroke-width="2.5"
@@ -115,37 +209,53 @@
           type="search"
           placeholder="Search products, coffee, Kanga..."
           bind:value={appState.searchQuery}
-          class="w-full bg-transparent border-0 focus:outline-none focus:ring-0 focus:border-transparent text-xs font-semibold text-slate-800 placeholder-slate-400 focus:outline-none"
+          class="w-full bg-transparent border-0 focus:outline-none text-[13.5px] font-medium focus:ring-0 text-gray-800 placeholder-gray-500"
         />
       </div>
     </form>
-
-    <!-- Right Side Basket & Account Controls -->
-    <div class="flex items-center gap-4 shrink-0">
-      <!-- Account Link -->
-      <button
-        onclick={() => goto("/cart")}
-        class="hidden md:flex items-center gap-1.5 text-slate-800 hover:text-emerald-700 text-xs font-extrabold focus:outline-none transition-colors"
-      >
-        <svg
-          class="w-4.5 h-4.5 stroke-slate-800"
-          fill="none"
-          stroke-width="2.1"
-          viewBox="0 0 24 24"
+ 
+    <div class="flex items-center gap-2.5 shrink-0">
+      {#if appState.isLoggedIn}
+        <button
+          onclick={() => goto("/account")}
+          class="hidden md:flex items-center gap-1.5 text-gray-800 text-[12.5px] font-bold focus:outline-none transition-colors px-3.5 py-2 hover:bg-gray-100 rounded-full"
         >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z"
-          />
-        </svg>
-        <span>Profile</span>
-      </button>
-
-      <!-- Instacart Signature Green Cart Pill -->
+          <svg
+            class="w-4.5 h-4.5 stroke-gray-800"
+            fill="none"
+            stroke-width="2.1"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z"
+            />
+          </svg>
+          <span>Account</span>
+        </button>
+      {:else}
+        <button
+          onclick={() => goto("/account")}
+          class="hidden md:inline-flex items-center justify-center text-gray-700 hover:bg-gray-100 text-[12.5px] font-bold h-9 px-4 rounded-full transition-colors focus:outline-none cursor-pointer"
+        >
+          Log in
+        </button>
+ 
+        <button
+          onclick={() => goto("/account")}
+          class="hidden md:inline-flex items-center justify-center text-white text-[12.5px] font-bold h-9 px-4 rounded-full transition-colors focus:outline-none cursor-pointer"
+          style="background: {ACCENT};"
+          onmouseover={(e) => e.currentTarget.style.background = '#099409'}
+          onmouseout={(e) => e.currentTarget.style.background = ACCENT}
+        >
+          Sign up
+        </button>
+      {/if}
+ 
       <button
         onclick={() => (appState.isCartOpen = true)}
-        class="bg-red-500 hover:bg-red-600 text-white font-extrabold text-xs px-4 py-2 rounded-full flex items-center gap-2 shadow-xs transition-all active:scale-95 focus:outline-none"
+        class="bg-gray-900 hover:bg-black text-white font-bold text-[12.5px] px-4 py-2.5 rounded-full flex items-center gap-2 transition-all active:scale-95 focus:outline-none"
       >
         <svg
           class="w-4.5 h-4.5 stroke-white"
@@ -162,7 +272,7 @@
         <span>Cart</span>
         {#if appState.cartCount > 0}
           <span
-            class="bg-white text-red-400 text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center select-none animate-bounce-in"
+            class="bg-white text-gray-900 text-[10.5px] font-extrabold w-5 h-5 rounded-full flex items-center justify-center select-none animate-bounce-in"
           >
             {appState.cartCount}
           </span>
@@ -170,124 +280,78 @@
       </button>
     </div>
   </header>
-
-  <!-- INNER CONTENT PANEL (Standard, global scroll bounds) -->
+ 
   <div class="flex-1 flex min-h-screen">
-    <!-- Sticky Sidebar Nav -->
-    <SidebarNav
-      selectedCategory={appState.selectedCategory}
-      fulfillmentMode={appState.fulfillmentMode}
-      onCategoryChange={updateCategory}
-      onFulfillmentChange={updateFulfillment}
-      onClaimCoupon={handleClaimCoupon}
-    />
-
-    <!-- Main Content Stream (Flows naturally into page body scroll) -->
-    <main
-      class="flex-1 min-w-0 p-4 sm:p-6 bg-white rounded-tl-3xl border-t border-l border-slate-100/5 2xl:px-20"
-    >
+    {#if !isAccountProfile}
+      <SidebarNav
+        selectedCategory={appState.selectedCategory}
+        fulfillmentMode={appState.fulfillmentMode}
+        onCategoryChange={updateCategory}
+        onFulfillmentChange={updateFulfillment}
+        onClaimCoupon={handleClaimCoupon}
+      />
+    {/if}
+ 
+    <main class={mainClass}>
       {@render children?.()}
     </main>
   </div>
-
-  <!-- Mobile Drawer Backdrop Overlay -->
+ 
   {#if appState.isSidebarOpen}
     <button
       onclick={() => (appState.isSidebarOpen = false)}
-      class="fixed inset-0 bg-slate-950/20 z-40 lg:hidden transition-opacity"
+      class="fixed inset-0 bg-gray-950/20 z-40 lg:hidden transition-opacity"
       aria-label="Close menu drawer"
     ></button>
   {/if}
 </div>
 
-<!-- TOAST ALERT SYSTEM -->
 <div
   class="fixed bottom-6 right-6 z-50 flex flex-col gap-2 w-full max-w-xs sm:max-w-sm pointer-events-none px-4 sm:px-0"
   aria-live="polite"
 >
-  {#each appState.toasts as toast (toast.id)}
-    <div
-      class="pointer-events-auto bg-slate-900 text-white rounded-xl px-4 py-3 shadow-lg flex items-center justify-between gap-3 text-xs font-bold animate-in slide-in-from-bottom-3 duration-200"
-    >
-      <div class="flex items-center gap-2 min-w-0">
-        <span
-          class="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0 animate-pulse"
-        ></span>
-        <span class="truncate">{toast.message}</span>
-      </div>
-      <button
-        onclick={() =>
-          (appState.toasts = appState.toasts.filter((t) => t.id !== toast.id))}
-        class="text-slate-400 hover:text-white transition-colors focus:outline-none"
-        aria-label="Dismiss"
-      >
-        <svg
-          class="w-3.5 h-3.5"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2.5"
-          viewBox="0 0 24 24"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            d="M6 18L18 6M6 6l12 12"
-          />
-        </svg>
-      </button>
+ {#each appState.toasts as toast (toast.id)}
+  <div
+    class="pointer-events-auto bg-white  text-white border-4 border-slate-800 rounded-2xl px-4 py-3.5 shadow-lg flex items-center justify-between gap-3 text-[12.5px] font-bold animate-in slide-in-from-bottom-3 duration-200"
+    style="font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;"
+  >
+    <div class="flex items-center gap-2.5 min-w-0">
+      <span
+        class="w-1.5 h-1.5 rounded-full shrink-0 animate-pulse"
+        style="background: {toast.type === 'error'
+          ? '#f43f5e'
+          : toast.type === 'success'
+          ? '#0aad0a'
+          : '#9ca3af'};"
+      ></span>
+      <span class="truncate text-slate-900">{toast.message}</span>
     </div>
-  {/each}
+    <button
+      onclick={() =>
+        (appState.toasts = appState.toasts.filter((t) => t.id !== toast.id))}
+      class="text-gray-400 hover:text-white transition-colors focus:outline-none shrink-0"
+      aria-label="Dismiss"
+    >
+      <svg
+        class="w-3.5 h-3.5"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2.5"
+        viewBox="0 0 24 24"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          d="M6 18L18 6M6 6l12 12"
+        />
+      </svg>
+    </button>
+  </div>
+{/each}
 </div>
 
-<!-- BRANCH PICKUP MODAL SELECTOR -->
-{#if appState.isLocationModalOpen}
-  <div
-    class="fixed inset-0 z-50 bg-slate-950/30 backdrop-blur-xs flex items-center justify-center p-4"
-  >
-    <div
-      class="bg-white rounded-2xl max-w-sm w-full p-5 shadow-2xl border border-slate-200 relative animate-in zoom-in-95 duration-150"
-    >
-      <h3
-        class="text-sm font-black text-slate-900 tracking-tight flex items-center gap-1.5"
-      >
-        📍 Pick a Pickup Post Office
-      </h3>
-      <p class="text-xs text-slate-500 mt-1 leading-normal font-medium">
-        Choosing your local branch ensures checkout orders route safely and
-        automatically loads subsidized networks.
-      </p>
-
-      <div class="mt-4 space-y-1.5 max-h-48 overflow-y-auto pr-1">
-        {#each branches as branch}
-          <button
-            onclick={() => {
-              appState.activeBranch = branch;
-              appState.isLocationModalOpen = false;
-            }}
-            class="w-full text-left p-2.5 rounded-xl border text-xs font-semibold flex justify-between items-center transition-all focus:outline-none
-              {appState.activeBranch === branch
-              ? 'border-emerald-600 bg-emerald-50 text-emerald-800'
-              : 'border-slate-200 hover:border-slate-300 bg-white text-slate-700 hover:scale-[1.01]'}"
-          >
-            <span>{branch}</span>
-            {#if appState.activeBranch === branch}
-              <span class="text-emerald-600 text-[10px] font-black uppercase"
-                >Selected</span
-              >
-            {/if}
-          </button>
-        {/each}
-      </div>
-
-      <button
-        onclick={() => (appState.isLocationModalOpen = false)}
-        class="mt-4 w-full bg-slate-900 hover:bg-slate-800 text-white font-extrabold py-2.5 rounded-xl text-xs transition-all focus:outline-none"
-      >
-        Save Branch Choice
-      </button>
-    </div>
-  </div>
-{/if}
+<!-- Inside routes/+layout.svelte inside the location modal structure -->
+<Locationselection />
 
 <style>
   @keyframes bounce-in {
@@ -305,3 +369,5 @@
     animation: bounce-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
   }
 </style>
+
+
