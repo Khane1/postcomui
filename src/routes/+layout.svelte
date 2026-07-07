@@ -18,67 +18,26 @@
   let debounceTimer;
   let { children } = $props();
 
-  // Search input & suggestion states
-  let locationSearchQuery = $state("");
-  let isLocating = $state(false);
-  let placeSuggestions = $state([]); // Google Maps places predictions array
-  let resolvedUserAddress = $state(""); // Reverse geocoded location address
-  let tempSelectedAddress = $state(""); // Tracks active address before confirming save
   let searchQuery = $state("");
 
-  // NEW: Address book fields state
-  let saveToAddressBook = $state(false);
-  let aptInput = $state("");
-  let businessInput = $state("");
-  let commentsInput = $state("");
-  let isSavingAddress = $state(false);
+  let googleMapsKey = $state("");
 
-  const GOOGLE_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "";
-
-  // NEW: Detail fields state & maps coordinate markers
-  let selectedLat = $state(0.3476); // Default Kampala coordinates
-  let selectedLng = $state(32.5825);
-
-  // Request browser GPS position [6]
-  function requestCustomerLocationOnOpen() {
-    if (!navigator.geolocation) {
-      appState.addToast(
-        "Geolocation is not supported by your browser.",
-        "error",
-      );
-      return;
-    }
-
-    isLocating = true;
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const { latitude, longitude } = position.coords;
-        selectedLat = latitude;
-        selectedLng = longitude;
-        await reverseGeocodeAddress(latitude, longitude);
-        isLocating = false;
-      },
-      () => {
-        isLocating = false;
-        appState.addToast(
-          "Permission denied or location lookup failed.",
-          "error",
-        );
-      },
-      { enableHighAccuracy: true, timeout: 5000 },
-    );
-  }
-
-  onMount(() => {
+  onMount(async () => {
     appState.initAuth();
-    loadGoogleMapsScript();
+    try {
+      const res = await fetch("/api/maps/key");
+      const data = await res.json();
+      googleMapsKey = data.key;
+      loadGoogleMapsScript();
+    } catch (err) {
+      console.warn("Could not load Maps config.", err);
+    }
   });
 
-  // Dynamically load Google Maps Places Library [3]
   function loadGoogleMapsScript() {
-    if (typeof window === "undefined" || window.google) return;
+    if (typeof window === "undefined" || window.google || !googleMapsKey) return;
     const script = document.createElement("script");
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_API_KEY}&libraries=places`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${googleMapsKey}&libraries=places`;
     script.async = true;
     script.defer = true;
     document.head.appendChild(script);

@@ -49,12 +49,6 @@
     }),
   );
 
-  $effect(() => {
-    appState.fetchProducts();
-    appState.fetchBanners();
-    appState.fetchWishlist(); // Sync wishlist on entry [5]
-  });
-
   function handleProductRedirect(product) {
     appState.selectedProductForModal = product;
   }

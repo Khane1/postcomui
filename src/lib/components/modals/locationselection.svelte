@@ -23,8 +23,6 @@
   let selectedLat = $state(0.3476);
   let selectedLng = $state(32.5825);
 
-  const GOOGLE_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "";
-
   $effect(() => {
     if (locationSearchQuery.trim() && window.google) {
       const autocompleteService = new google.maps.places.AutocompleteService();
@@ -56,13 +54,13 @@
   async function reverseGeocodeAddress(lat, lng) {
     try {
       const response = await fetch(
-        `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${GOOGLE_API_KEY}`,
+        `/api/maps/geocode?lat=${lat}&lng=${lng}`,
       );
       const data = await response.json();
       if (data.results && data.results.length > 0) {
         const address = data.results[0].formatted_address;
         resolvedUserAddress = address;
-        tempSelectedAddress = address; // Set temporary preview selection
+        tempSelectedAddress = address;
         appState.addToast(`Located near: ${address}`);
       }
     } catch (err) {

@@ -1,6 +1,6 @@
 // lib/state.svelte.js
 import { products as defaultProducts } from './data/products.js';
-import { publicApi, authApi, integrationApi, shippingApi } from './config/api.js';
+import { publicApi, authApi } from './config/api.js';
 import { mapBackendProductToUI, mapBackendBrandToUI,resolveImageUrl } from './utils/mappers.js';
 import { goto } from '$app/navigation';
 // Import update
@@ -43,6 +43,9 @@ class AppState {
   brands = $state([]);
   banners = $state([]);
   isLoading = $state(false);
+
+  _productsInFlight = false;
+  _bannersInFlight = false;
 
   get cartCount() {
     return this.cartItems.reduce((acc, item) => acc + item.quantity, 0);
@@ -373,7 +376,7 @@ class AppState {
    async fetchProfile() {
     try {
       const profileResponse = await authApi.get('auth/profile');
-      const profileData = profileResponse.data !== undefined ? response.data : response;
+      const profileData = profileResponse.data !== undefined ? profileResponse.data : profileResponse;
 
       // Fetch extended customer records to acquire customer ID
       const customerData = await this.getCurrentUser();
@@ -425,13 +428,11 @@ class AppState {
         marketing_preferences: marketingPreferences ? 'true' : 'false' // Matches stringified boolean parameter
       };
       
-      alert(JSON.stringify(payload))
       const response = await authApi.post('customers', payload);
       this.addToast("Onboarding profile setup completed!");
       await this.fetchProfile();
       return { success: true, data: response.data };
     } catch (err) {
-      alert(JSON.stringify(err.response))
       const message = err.response?.data?.message || "Profile completion failed.";
       this.addToast(message, "error");
       return { success: false, error: message };
@@ -645,62 +646,68 @@ class AppState {
   // }
 
   async fetchProducts() {
-    this.isLoading = true;
-    try {
-      let response;
-      if (this.searchQuery) {
-        response = await publicApi.get('search/products', {
-          params: {
-            q: this.searchQuery,
-            per_page: 100,
-            is_published: true
-          }
+    if (this._productsInFlight) return;
+
+    if (this.searchQuery) {
+      this._productsInFlight = true;
+      this.isLoading = true;
+      try {
+        const response = await publicApi.get('search/products', {
+          params: { q: this.searchQuery, per_page: 100, is_published: true }
         });
-      } else {
-        response = await publicApi.get('products', {
-          params: {
-            page: 1,
-            perPage: 100,
-            is_published: true,
-            category_id: this.selectedCategory !== 'All' ? this.selectedCategory : undefined
-          }
-        });
-      }
-      
-      const data = response.data !== undefined ? response.data : response;
-      
-      let rawList = [];
-      if (data) {
-        if (Array.isArray(data)) {
-          rawList = data;
-        } else if (data.hits && Array.isArray(data.hits)) {
-          rawList = data.hits;
-        } else if (data.content && Array.isArray(data.content)) {
-          rawList = data.content;
-        } else if (data.products && Array.isArray(data.products)) {
-          rawList = data.products;
-        } else if (data.data && Array.isArray(data.data)) {
-          rawList = data.data;
-        } else if (data.items && Array.isArray(data.items)) {
-          rawList = data.items;
+        const data = response.data !== undefined ? response.data : response;
+        let rawList = [];
+        if (data) {
+          if (Array.isArray(data)) rawList = data;
+          else if (data.hits && Array.isArray(data.hits)) rawList = data.hits;
+          else if (data.content && Array.isArray(data.content)) rawList = data.content;
+          else if (data.data && Array.isArray(data.data)) rawList = data.data;
         }
+        this.allProducts = rawList.map(mapBackendProductToUI).filter(Boolean);
+      } catch (err) {
+        console.warn("[Products State] Search API failed.", err);
+        this.allProducts = [];
+      } finally {
+        this.isLoading = false;
+        this._productsInFlight = false;
       }
+      return;
+    }
 
-      this.allProducts = rawList.map(mapBackendProductToUI).filter(Boolean);
+    // Non-search: show local data instantly
+    if (this.allProducts.length === 0) {
+      this.allProducts = defaultProducts;
+    }
 
-      // Fallback to default local products ONLY when no search query is active
-      if (this.allProducts.length === 0 && !this.searchQuery) {
-        this.allProducts = defaultProducts;
-      }
-    } catch (err) {
-      console.warn("[Products State] Failed to load from API. Falling back to local data.", err);
-      if (!this.searchQuery) {
-        this.allProducts = defaultProducts;
-      } else {
-        this.allProducts = []; // Maintain empty result state for failed API queries
-      }
-    } finally {
-      this.isLoading = false;
+    if (this.isLoggedIn) {
+      this._productsInFlight = true;
+      publicApi.get('products', {
+        params: {
+          page: 1, perPage: 100, is_published: true,
+          category_id: this.selectedCategory !== 'All' ? this.selectedCategory : undefined
+        },
+        timeout: 15000
+      }).then(response => {
+        const data = response.data !== undefined ? response.data : response;
+        let rawList = [];
+        if (data) {
+          if (Array.isArray(data)) rawList = data;
+          else if (data.hits && Array.isArray(data.hits)) rawList = data.hits;
+          else if (data.content && Array.isArray(data.content)) rawList = data.content;
+          else if (data.products && Array.isArray(data.products)) rawList = data.products;
+          else if (data.data && Array.isArray(data.data)) rawList = data.data;
+          else if (data.items && Array.isArray(data.items)) rawList = data.items;
+        }
+        const mapped = rawList.map(mapBackendProductToUI).filter(Boolean);
+        if (mapped.length > 0) {
+          const seen = new Set();
+          this.allProducts = mapped.filter(p => {
+            if (seen.has(p.id)) return false;
+            seen.add(p.id);
+            return true;
+          });
+        }
+      }).catch(() => {}).finally(() => { this._productsInFlight = false; });
     }
   }
 
@@ -731,21 +738,18 @@ class AppState {
 
 // Method update
   async fetchBanners() {
+    if (this._bannersInFlight || this.banners.length > 0) return;
+    this._bannersInFlight = true;
     try {
-      const response = await publicApi.get('banners');
+      const response = await publicApi.get('banners', { timeout: 15000 });
       const data = response.data !== undefined ? response.data : response;
       
       let rawList = [];
       if (data) {
-        if (Array.isArray(data)) {
-          rawList = data;
-        } else if (data.content && Array.isArray(data.content)) {
-          rawList = data.content;
-        } else if (data.banners && Array.isArray(data.banners)) {
-          rawList = data.banners;
-        } else if (data.data && Array.isArray(data.data)) {
-          rawList = data.data;
-        }
+        if (Array.isArray(data)) rawList = data;
+        else if (data.content && Array.isArray(data.content)) rawList = data.content;
+        else if (data.banners && Array.isArray(data.banners)) rawList = data.banners;
+        else if (data.data && Array.isArray(data.data)) rawList = data.data;
       }
       this.banners = rawList.map(b => ({
         id: b.id,
@@ -756,6 +760,8 @@ class AppState {
       }));
     } catch (err) {
       this.banners = [];
+    } finally {
+      this._bannersInFlight = false;
     }
   }
 
@@ -1014,9 +1020,9 @@ class AppState {
         sessionStorage.setItem('accessToken', res.data.accessToken);
         await this.syncCartItems();
       }
-      return true;
+      return { success: true, data: res.data };
     } catch (err) {
-      return true;
+      return { success: false, error: err.response?.data?.message || 'OTP verification failed' };
     }
   }
 
@@ -1122,50 +1128,19 @@ class AppState {
     if (!this.isLoggedIn) return;
     this.isLoading = true;
     try {
-      // Step 1: Discover flat order lines with highly robust parameter overrides to bypass backend limits
       const response = await authApi.get('orders/customer', {
-        params: {
-          page: 1,
-          per_page: 100,   // Standard REST snake_case
-          perPage: 100,    // CamelCase override
-          limit: 100,      // SQL-based pagination override
-          size: 100        // Spring Boot Pageable override
-        }
+        params: { page: 1, per_page: 100 }
       });
       const data = response.data !== undefined ? response.data : response;
 
       let flatList = [];
       if (data) {
-        if (Array.isArray(data)) {
-          flatList = data;
-        } else if (data.content && Array.isArray(data.content)) {
-          flatList = data.content;
-        } else if (data.data && Array.isArray(data.data)) {
-          flatList = data.data;
-        }
+        if (Array.isArray(data)) flatList = data;
+        else if (data.content && Array.isArray(data.content)) flatList = data.content;
+        else if (data.data && Array.isArray(data.data)) flatList = data.data;
       }
 
-      const uniqueIds = [...new Set(flatList.map(item => item.order_id || item.id).filter(Boolean))];
-
-      // Step 2: Fetch full detailed structure in parallel with automated error-recovery [1]
-      const detailedOrders = await Promise.all(
-        uniqueIds.map(async (id) => {
-          try {
-            const res = await authApi.get(`orders/${id}`);
-            const orderData = res.data !== undefined ? res.data : res;
-            return orderData;
-          } catch (err) {
-            console.warn(`[Orders State] Enriching details failed for order ID: ${id}. Recovering fallback.`, err);
-            
-            // Fallback recovery: preserve the order from flatList so it is not dropped
-            const fallbackItem = flatList.find(item => (item.order_id || item.id) === id);
-            return fallbackItem || null;
-          }
-        })
-      );
-
-      this.orders = detailedOrders.filter(Boolean);
-      console.log("[Orders State] Synced customer order list successfully:", this.orders);
+      this.orders = flatList.filter(Boolean);
     } catch (err) {
       console.warn("Could not retrieve customer orders.", err);
       this.orders = [];
