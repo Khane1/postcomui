@@ -22,6 +22,17 @@
   let cardExpiry = $state("");
   let cardCvv = $state("");
 
+  // International Shipping Input Fields
+  let selectedShippingDestinationId = $state("");
+  let selectedShippingDestinationName = $state("");
+  let receiverNameInput = $state("");
+  let receiverAddressInput = $state("");
+  let receiverPhoneInput = $state("");
+  let receiverCityInput = $state("");
+  let receiverStateInput = $state("");
+  let receiverZipInput = $state("");
+  let shippingNotesInput = $state("");
+
   let subtotal = $derived(
     appState.cartItems.reduce((acc, item) => {
       const price = Number(item?.product?.price || 0);
@@ -30,8 +41,8 @@
     }, 0),
   );
 
-  let hasDelivery = $derived(
-    appState.cartItems.some((item) => item.fulfillment === "delivery"),
+  let fulfillmentMode = $derived(
+    appState.cartItems[0]?.fulfillment || "pickup"
   );
 
   let total = $derived(subtotal + shippingFee);
@@ -47,7 +58,6 @@
     ) {
       return null;
     }
-    // Filter out human-readable labels (like "Kampala GPO")
     if (s.includes(" ") || (s.match(/[A-Z]/) && !s.match(/[a-f]/i))) {
       return null;
     }
@@ -58,11 +68,29 @@
     appState.fetchPaymentMethods();
     appState.fetchCustomerAddresses();
     appState.fetchPickupCenters();
+    appState.fetchShippingCountries();
 
     // Populate profile phone coordinates
     const user = await appState.getCurrentUser();
     if (user && user.phone_number) {
       phoneNumberInput = user.phone_number;
+    }
+  });
+
+  // Watcher effect for auto-filling destination label
+  $effect(() => {
+    const selected = appState.shippingCountries.find(d => d.id === selectedShippingDestinationId);
+    selectedShippingDestinationName = selected?.label || '';
+  });
+
+  $effect(() => {
+    if (appState.user) {
+      if (!receiverNameInput) {
+        receiverNameInput = `${appState.user.first_name || ""} ${appState.user.last_name || ""}`.trim();
+      }
+      if (!receiverPhoneInput) {
+        receiverPhoneInput = appState.user.phone_number || "";
+      }
     }
   });
 
@@ -76,7 +104,7 @@
     }
   });
 
-  // Calculate fees safely - only polling once UUIDs are resolved
+  // Calculate delivery fees reactively
   $effect(() => {
     async function calculateFee() {
       if (appState.cartItems.length === 0) {
@@ -90,31 +118,47 @@
       }, 0);
       const packageWeightKg = Math.max(0.5, totalGrams / 1000);
 
+      // Handle International Shipping Option
+      if (fulfillmentMode === 'shipping') {
+        if (!selectedShippingDestinationId) {
+          shippingFee = 0;
+          return;
+        }
+        const payload = {
+          delivery_method: "SHIPPING",
+          package_weight: packageWeightKg,
+          shipping_destination_id: selectedShippingDestinationId
+        };
+        const fee = await appState.getDeliveryFee(payload);
+        shippingFee = fee;
+        return;
+      }
+
+      // Handle GPO Station Pickups and Domestic Deliveries
       const activeCenter = appState.allPickUpCenters.find(
         (c) =>
           c.name === appState.activeBranch ||
           String(c.id) === String(appState.activeBranch),
       );
 
-      const cleanAddrId = hasDelivery
+      const cleanAddrId = fulfillmentMode === 'delivery'
         ? sanitizeUuid(appState.selectedAddressId)
         : null;
-      const cleanCenterId = !hasDelivery
+      const cleanCenterId = fulfillmentMode === 'pickup'
         ? sanitizeUuid(activeCenter?.id)
         : null;
 
-      // Defensive check: Do not execute network requests until critical UUID parameters resolve
-      if (hasDelivery && !cleanAddrId) {
+      if (fulfillmentMode === 'delivery' && !cleanAddrId) {
         shippingFee = 5500; // Static fallback
         return;
       }
-      if (!hasDelivery && !cleanCenterId) {
+      if (fulfillmentMode === 'pickup' && !cleanCenterId) {
         shippingFee = 0; // Free pickup fallback
         return;
       }
 
       const payload = {
-        delivery_method: hasDelivery ? "DOOR_DELIVERY" : "PICKUP_STATION",
+        delivery_method: fulfillmentMode === 'delivery' ? "DOOR_DELIVERY" : "PICKUP_STATION",
         package_weight: packageWeightKg,
         delivery_address_id: cleanAddrId,
         pickup_center_id: cleanCenterId,
@@ -206,62 +250,72 @@
         : nameLower.includes("airtel");
     });
 
-    const activeCenter = appState.allPickUpCenters.find(
-      (c) =>
-        c.name === appState.activeBranch ||
-        String(c.id) === String(appState.activeBranch),
-    );
+    let cleanAddrId = null;
+    let cleanCenterId = null;
+    let cleanDestId = null;
+    let deliveryMethod = "PICKUP_STATION";
+
+    if (fulfillmentMode === 'delivery') {
+      cleanAddrId = sanitizeUuid(appState.selectedAddressId);
+      deliveryMethod = "DOOR_DELIVERY";
+    } else if (fulfillmentMode === 'pickup') {
+      const activeCenter = appState.allPickUpCenters.find(
+        (c) => c.name === appState.activeBranch || String(c.id) === String(appState.activeBranch),
+      );
+      cleanCenterId = sanitizeUuid(activeCenter?.id);
+      deliveryMethod = "PICKUP_STATION";
+    } else if (fulfillmentMode === 'shipping') {
+      cleanDestId = selectedShippingDestinationId;
+      deliveryMethod = "SHIPPING";
+    }
+
+    // Validation checks for each mode
+    if (fulfillmentMode === 'delivery' && !cleanAddrId) {
+      appState.addToast("Please select or add a delivery address to complete your order.", "error");
+      return;
+    }
+    if (fulfillmentMode === 'pickup' && !cleanCenterId) {
+      appState.addToast("Retrieving pickup center parameters. Please wait...", "info");
+      return;
+    }
+    if (fulfillmentMode === 'shipping') {
+      if (!cleanDestId) {
+        appState.addToast("Please select an international shipping destination country.", "error");
+        return;
+      }
+      if (
+        !receiverNameInput.trim() || 
+        !receiverAddressInput.trim() || 
+        !receiverPhoneInput.trim() || 
+        !receiverCityInput.trim() || 
+        !receiverStateInput.trim() || 
+        !receiverZipInput.trim()
+      ) {
+        appState.addToast("Please fill in all international receiver address fields.", "error");
+        return;
+      }
+    }
 
     const selectedAddress = appState.customerAddresses.find(
       (a) => String(a.id) === String(appState.selectedAddressId),
     );
 
-    const cleanAddrId = hasDelivery
-      ? sanitizeUuid(appState.selectedAddressId)
-      : null;
-    const cleanCenterId = !hasDelivery ? sanitizeUuid(activeCenter?.id) : null;
-
-    // Validation guard: Rejects click if UUID values have not completed loading
-    if (hasDelivery && !cleanAddrId) {
-      appState.addToast(
-        "Please select or add a delivery address to complete your order.",
-        "error",
-      );
-      return;
-    }
-    if (!hasDelivery && !cleanCenterId) {
-      appState.addToast(
-        "Retrieving pickup center parameters. Please wait a moment...",
-        "info",
-      );
-      return;
-    }
-
-    const notesDetail = `Checked out via pay form. ${paymentType === "momo" ? "MoMo: " + phoneNumberInput : "Card"}.${!hasDelivery ? " Selected Pickup Station: " + appState.activeBranch : ""}`;
+    const notesDetail = fulfillmentMode === 'shipping'
+      ? shippingNotesInput.trim()
+      : `Checked out via pay form. ${paymentType === "momo" ? "MoMo: " + phoneNumberInput : "Card"}.${fulfillmentMode === 'pickup' ? " Selected Pickup Station: " + appState.activeBranch : ""}`;
 
     const payload = {
       delivery_address_id: cleanAddrId,
       pickup_center_id: cleanCenterId,
-      delivery_method: hasDelivery ? "DOOR_DELIVERY" : "PICKUP_STATION",
-      shipping_destination_id: null,
-      shipping_destination: "",
-      shipping_receiver_name: appState.user
-        ? `${appState.user.first_name || ""} ${appState.user.last_name || ""}`.trim()
-        : "Postal Customer",
-      shipping_receiver_address: selectedAddress
-        ? selectedAddress.street || selectedAddress.line1 || ""
-        : "",
-      shipping_receiver_phone_number:
-        phoneNumberInput || appState.user?.phone_number || "",
-      shipping_receiver_city: selectedAddress
-        ? selectedAddress.city || "Kampala"
-        : "Kampala",
-      shipping_receiver_state: selectedAddress
-        ? selectedAddress.state || selectedAddress.city || "Central"
-        : "Central",
-      shipping_receiver_zip_code: selectedAddress
-        ? selectedAddress.zip_code || "00000"
-        : "00000",
+      delivery_method: deliveryMethod,
+      shipping_destination_id: cleanDestId,
+      shipping_destination: fulfillmentMode === 'shipping' ? selectedShippingDestinationName : "",
+      shipping_receiver_name: fulfillmentMode === 'shipping' ? receiverNameInput.trim() : (appState.user ? `${appState.user.first_name || ""} ${appState.user.last_name || ""}`.trim() : "Postal Customer"),
+      shipping_receiver_address: fulfillmentMode === 'shipping' ? receiverAddressInput.trim() : (selectedAddress ? selectedAddress.street || selectedAddress.line1 || "" : ""),
+      shipping_receiver_phone_number: fulfillmentMode === 'shipping' ? receiverPhoneInput.trim() : (phoneNumberInput || appState.user?.phone_number || ""),
+      shipping_receiver_city: fulfillmentMode === 'shipping' ? receiverCityInput.trim() : (selectedAddress ? selectedAddress.city || "Kampala" : "Kampala"),
+      shipping_receiver_state: fulfillmentMode === 'shipping' ? receiverStateInput.trim() : (selectedAddress ? selectedAddress.state || selectedAddress.city || "Central" : "Central"),
+      shipping_receiver_zip_code: fulfillmentMode === 'shipping' ? receiverZipInput.trim() : (selectedAddress ? selectedAddress.zip_code || "00000" : "00000"),
       notes: notesDetail,
     };
 
@@ -277,10 +331,9 @@
 
       if (orderId && matchedPayment?.id) {
         const finalAmount = Math.max(0, total);
-
         try {
           if (paymentType === "momo") {
-            let order = await appState.addOrderPayment(
+            await appState.addOrderPayment(
               orderId,
               finalAmount,
               matchedPayment.id,
@@ -318,11 +371,11 @@
     }
   }
 
-  function toggleFulfillment() {
-    const targetMode = hasDelivery ? "pickup" : "delivery";
+  function setAllFulfillment(mode) {
     appState.cartItems.forEach((item) => {
-      item.fulfillment = targetMode;
+      item.fulfillment = mode;
     });
+    appState.cartItems = [...appState.cartItems];
   }
 
   // --- REAL-TIME PAYMENT VALIDATORS ---
@@ -401,6 +454,31 @@
   let isMomoValid = $derived(
     /^\+?\d{9,15}$/.test(phoneNumberInput.replace(/\s/g, "")),
   );
+
+  let isPlaceOrderDisabled = $derived.by(() => {
+    if (appState.cartItems.length === 0) return true;
+
+    if (fulfillmentMode === 'delivery') {
+      if (appState.customerAddresses.length === 0 || !appState.selectedAddressId) return true;
+    }
+    if (fulfillmentMode === 'shipping') {
+      if (!selectedShippingDestinationId) return true;
+      if (
+        !receiverNameInput.trim() || 
+        !receiverAddressInput.trim() || 
+        !receiverPhoneInput.trim() || 
+        !receiverCityInput.trim() || 
+        !receiverStateInput.trim() || 
+        !receiverZipInput.trim()
+      ) return true;
+    }
+
+    if (paymentType === 'card') {
+      return !isCardFormValid;
+    } else {
+      return !isMomoValid;
+    }
+  });
 </script>
 
 <div class="space-y-8 select-none font-sans py-2">
@@ -557,21 +635,22 @@
             </h3>
           </div>
 
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <button
-              onclick={toggleFulfillment}
+              type="button"
+              onclick={() => setAllFulfillment("pickup")}
               class="w-full text-left p-4 rounded-xl border-2 transition-all flex items-start gap-3 focus:outline-none
-                {!hasDelivery
+                {fulfillmentMode === 'pickup'
                 ? 'border-[#0aad0a] bg-emerald-50/10'
                 : 'border-slate-200 bg-white hover:border-slate-300'}"
             >
               <div class="pt-0.5">
                 <div
-                  class="w-4 h-4 rounded-full border flex items-center justify-center {!hasDelivery
+                  class="w-4 h-4 rounded-full border flex items-center justify-center {fulfillmentMode === 'pickup'
                     ? 'border-[#0aad0a]'
                     : 'border-slate-300'}"
                 >
-                  {#if !hasDelivery}
+                  {#if fulfillmentMode === 'pickup'}
                     <div class="w-2 h-2 rounded-full bg-[#0aad0a]"></div>
                   {/if}
                 </div>
@@ -584,19 +663,20 @@
             </button>
 
             <button
-              onclick={toggleFulfillment}
+              type="button"
+              onclick={() => setAllFulfillment("delivery")}
               class="w-full text-left p-4 rounded-xl border-2 transition-all flex items-start gap-3 focus:outline-none
-                {hasDelivery
+                {fulfillmentMode === 'delivery'
                 ? 'border-[#0aad0a] bg-emerald-50/10'
                 : 'border-slate-200 bg-white hover:border-slate-300'}"
             >
               <div class="pt-0.5">
                 <div
-                  class="w-4 h-4 rounded-full border flex items-center justify-center {hasDelivery
+                  class="w-4 h-4 rounded-full border flex items-center justify-center {fulfillmentMode === 'delivery'
                     ? 'border-[#0aad0a]'
                     : 'border-slate-300'}"
                 >
-                  {#if hasDelivery}
+                  {#if fulfillmentMode === 'delivery'}
                     <div class="w-2 h-2 rounded-full bg-[#0aad0a]"></div>
                   {/if}
                 </div>
@@ -604,6 +684,32 @@
               <div>
                 <span class="text-sm text-slate-900 block font-bold"
                   >Alternative Delivery</span
+                >
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onclick={() => setAllFulfillment("shipping")}
+              class="w-full text-left p-4 rounded-xl border-2 transition-all flex items-start gap-3 focus:outline-none
+                {fulfillmentMode === 'shipping'
+                ? 'border-[#0aad0a] bg-emerald-50/10'
+                : 'border-slate-200 bg-white hover:border-slate-300'}"
+            >
+              <div class="pt-0.5">
+                <div
+                  class="w-4 h-4 rounded-full border flex items-center justify-center {fulfillmentMode === 'shipping'
+                    ? 'border-[#0aad0a]'
+                    : 'border-slate-300'}"
+                >
+                  {#if fulfillmentMode === 'shipping'}
+                    <div class="w-2 h-2 rounded-full bg-[#0aad0a]"></div>
+                  {/if}
+                </div>
+              </div>
+              <div>
+                <span class="text-sm text-slate-900 block font-bold"
+                  >International Shipping</span
                 >
               </div>
             </button>
@@ -620,12 +726,14 @@
             >
               Delivery Location
             </h3>
-            <button
-              onclick={() => (appState.isLocationModalOpen = true)}
-              class="text-xs font-bold text-[#0aad0a] hover:underline focus:outline-none"
-            >
-              Change
-            </button>
+            {#if fulfillmentMode !== 'shipping'}
+              <button
+                onclick={() => (appState.isLocationModalOpen = true)}
+                class="text-xs font-bold text-[#0aad0a] hover:underline focus:outline-none"
+              >
+                Change
+              </button>
+            {/if}
           </div>
 
           <div class="flex items-start gap-4">
@@ -653,7 +761,7 @@
             </div>
 
             <div class="space-y-3 flex-1 min-w-0">
-              {#if hasDelivery}
+              {#if fulfillmentMode === 'delivery'}
                 {#if appState.customerAddresses.length > 0}
                   {@const currentAddr =
                     appState.customerAddresses.find(
@@ -714,7 +822,7 @@
                     >Register address coordinates in settings</a
                   >
                 {/if}
-              {:else}
+              {:else if fulfillmentMode === 'pickup'}
                 <p class="text-sm font-semibold text-slate-900">
                   Post Office Smart Pickup
                 </p>
@@ -737,6 +845,111 @@
                       <option value={station.value}>{station.label}</option>
                     {/each}
                   </select>
+                </div>
+              {:else if fulfillmentMode === 'shipping'}
+                <div class="space-y-4 w-full">
+                  <!-- International Destination Country Selector -->
+                  <div class="space-y-1.5">
+                    <label for="shipping-dest-select" class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest">Destination Country</label>
+                    <select
+                      id="shipping-dest-select"
+                      bind:value={selectedShippingDestinationId}
+                      class="w-full text-xs font-semibold text-slate-700 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 focus:border-[#003d29] focus:outline-none cursor-pointer transition-colors"
+                    >
+                      <option value="" disabled>Select destination country...</option>
+                      {#each appState.shippingCountries as country (country.id)}
+                        <option value={country.id}>{country.label}</option>
+                      {/each}
+                    </select>
+                  </div>
+
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <!-- Receiver Name -->
+                    <div class="border border-slate-200 rounded-[14px] px-4 pt-2.5 pb-3 flex flex-col bg-white">
+                      <label for="recv-name" class="text-[11px] text-neutral-500 font-normal mb-0.5">Receiver Name</label>
+                      <input
+                        id="recv-name"
+                        type="text"
+                        bind:value={receiverNameInput}
+                        placeholder="John Doe"
+                        class="outline-none text-[15px] text-[#333] bg-transparent w-full p-0 border-0 focus:ring-0 leading-normal"
+                      />
+                    </div>
+
+                    <!-- Receiver Phone -->
+                    <div class="border border-slate-200 rounded-[14px] px-4 pt-2.5 pb-3 flex flex-col bg-white">
+                      <label for="recv-phone" class="text-[11px] text-neutral-500 font-normal mb-0.5">Receiver Phone</label>
+                      <input
+                        id="recv-phone"
+                        type="text"
+                        bind:value={receiverPhoneInput}
+                        placeholder="+1 555-0199"
+                        class="outline-none text-[15px] text-[#333] bg-transparent w-full p-0 border-0 focus:ring-0 leading-normal"
+                      />
+                    </div>
+                  </div>
+
+                  <!-- Receiver Address -->
+                  <div class="border border-slate-200 rounded-[14px] px-4 pt-2.5 pb-3 flex flex-col bg-white">
+                    <label for="recv-addr" class="text-[11px] text-neutral-500 font-normal mb-0.5">Street Address</label>
+                    <input
+                      id="recv-addr"
+                      type="text"
+                      bind:value={receiverAddressInput}
+                      placeholder="123 Main St, Apt 4B"
+                      class="outline-none text-[15px] text-[#333] bg-transparent w-full p-0 border-0 focus:ring-0 leading-normal"
+                    />
+                  </div>
+
+                  <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <!-- City -->
+                    <div class="border border-slate-200 rounded-[14px] px-4 pt-2.5 pb-3 flex flex-col bg-white">
+                      <label for="recv-city" class="text-[11px] text-neutral-500 font-normal mb-0.5">City</label>
+                      <input
+                        id="recv-city"
+                        type="text"
+                        bind:value={receiverCityInput}
+                        placeholder="New York"
+                        class="outline-none text-[15px] text-[#333] bg-transparent w-full p-0 border-0 focus:ring-0 leading-normal"
+                      />
+                    </div>
+
+                    <!-- State / Region -->
+                    <div class="border border-slate-200 rounded-[14px] px-4 pt-2.5 pb-3 flex flex-col bg-white">
+                      <label for="recv-state" class="text-[11px] text-neutral-500 font-normal mb-0.5">State / Region</label>
+                      <input
+                        id="recv-state"
+                        type="text"
+                        bind:value={receiverStateInput}
+                        placeholder="NY"
+                        class="outline-none text-[15px] text-[#333] bg-transparent w-full p-0 border-0 focus:ring-0 leading-normal"
+                      />
+                    </div>
+
+                    <!-- Zip Code -->
+                    <div class="border border-slate-200 rounded-[14px] px-4 pt-2.5 pb-3 flex flex-col bg-white">
+                      <label for="recv-zip" class="text-[11px] text-neutral-500 font-normal mb-0.5">Zip / Postal Code</label>
+                      <input
+                        id="recv-zip"
+                        type="text"
+                        bind:value={receiverZipInput}
+                        placeholder="10001"
+                        class="outline-none text-[15px] text-[#333] bg-transparent w-full p-0 border-0 focus:ring-0 leading-normal"
+                      />
+                    </div>
+                  </div>
+
+                  <!-- Shipping Notes -->
+                  <div class="border border-slate-200 rounded-[14px] px-4 pt-2.5 pb-3 flex flex-col bg-white">
+                    <label for="recv-notes" class="text-[11px] text-neutral-500 font-normal mb-0.5">Shipping Notes</label>
+                    <textarea
+                      id="recv-notes"
+                      bind:value={shippingNotesInput}
+                      placeholder="Special instructions for customs or international delivery..."
+                      rows="2"
+                      class="outline-none text-[13px] text-[#333] bg-transparent w-full p-0 border-0 focus:ring-0 leading-normal resize-none"
+                    ></textarea>
+                  </div>
                 </div>
               {/if}
             </div>
@@ -987,9 +1200,7 @@
 
           <button
             onclick={processOrder}
-            disabled={(hasDelivery &&
-              appState.customerAddresses.length === 0) ||
-              (paymentType === "card" ? !isCardFormValid : !isMomoValid)}
+            disabled={isPlaceOrderDisabled}
             class="w-full bg-[#0aad0a] hover:bg-[#099409] disabled:bg-slate-200 disabled:text-slate-400 text-white font-extrabold text-xs h-11 rounded-full flex items-center justify-center transition-all shadow-md focus:outline-none cursor-pointer"
           >
             Place Order

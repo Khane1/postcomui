@@ -14,9 +14,9 @@
     { id: "Account Information", path: "/account", label: "Account Information" },
     { id: "My Orders", path: "/account/myorders", label: "My Orders" },
     { id: "Favourites", path: "/account/favorites", label: "Favourites" },
-    { id: "Payment method", path: "/account/paymentmethod", label: "Payment method" },
+    // { id: "Payment method", path: "/account/paymentmethod", label: "Payment method" },
     { id: "My Address", path: "/account/myaddress", label: "My Address" },
-    { id: "Notification", path: "/account/notification", label: "Notification" },
+    // { id: "Notification", path: "/account/notification", label: "Notification" },
     { id: "Help", path: "/account/help", label: "Help" }
   ];
 

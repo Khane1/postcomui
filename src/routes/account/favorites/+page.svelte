@@ -40,7 +40,7 @@
   }
 </script>
 
-<div class="max-w-2xl text-slate-900 py-6 select-none flex flex-col gap-6">
+<div class="max-w-2xl xl:max-w-full text-slate-900 py-6 select-none flex flex-col gap-6">
   <!-- Section Header -->
   <div class="border-b border-slate-100 pb-4">
     <h2 class="text-[22px] font-bold text-slate-900 tracking-tight">Favorites</h2>
@@ -72,7 +72,7 @@
     </div>
   {:else}
     <!-- Product Grid -->
-    <div class="grid grid-cols-2 sm:grid-cols-3 gap-4 animate-in fade-in duration-200">
+    <div class="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-8 gap-4 animate-in fade-in duration-200">
       {#each favoritedProductsList as product (product.id)}
         <div class="w-full">
           <ProductCard 

@@ -25,24 +25,24 @@
       label: "Favourites",
       icon: "heart",
     },
-    {
-      id: "Payment method",
-      path: "/account/paymentmethod",
-      label: "Payment method",
-      icon: "card",
-    },
+    // {
+    //   id: "Payment method",
+    //   path: "/account/paymentmethod",
+    //   label: "Payment method",
+    //   icon: "card",
+    // },
     {
       id: "My Address",
       path: "/account/myaddress",
       label: "My Address",
       icon: "pin",
     },
-    {
-      id: "Notification",
-      path: "/account/notification",
-      label: "Notification",
-      icon: "bell",
-    },
+    // {
+    //   id: "Notification",
+    //   path: "/account/notification",
+    //   label: "Notification",
+    //   icon: "bell",
+    // },
     { id: "Help", path: "/account/help", label: "Help", icon: "help" },
   ];
 

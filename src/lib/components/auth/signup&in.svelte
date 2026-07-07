@@ -21,8 +21,11 @@
     let password = $state("");
     let confirmPassword = $state("");
     let otpValue = $state("");
-
+    async function handleGoogleLogin(){
+        
+    }
     // Handle form submissions
+   // Handle form submissions
     async function handleAuthSubmit(event) {
         event.preventDefault();
 
@@ -37,10 +40,14 @@
                 const res = await appState.signUp(firstName, lastName, email, phone);
                 isLoading = false;
                 if (res.success) {
-                    signupStep = 2; // Move to OTP
+                    appState.addToast("Account registered successfully! Please sign in.", "success");
+                    isSignUp = false; // Toggle view back to Sign In
+                    signupStep = 1;
+                    password = "";
+                    confirmPassword = "";
                 }
             } 
-            // STEP 2: OTP CODE VALIDATION
+            // STEP 2: OTP CODE VALIDATION (Retained for validation safety)
             else if (signupStep === 2) {
                 if (!otpValue.trim()) {
                     appState.addToast("Please enter the verification code.", "error");
@@ -50,10 +57,10 @@
                 const res = await appState.verifyOtpCode(otpValue);
                 isLoading = false;
                 if (res.success) {
-                    signupStep = 3; // Move to Password Set
+                    signupStep = 3;
                 }
             } 
-            // STEP 3: PASSWORD SETTING & REGISTRATION COMPLETION
+            // STEP 3: PASSWORD SETTING (Retained for validation safety)
             else if (signupStep === 3) {
                 if (!password || !confirmPassword) {
                     appState.addToast("Password values cannot be empty.", "error");
@@ -67,7 +74,6 @@
                 const res = await appState.setPassword(password, confirmPassword);
                 isLoading = false;
                 if (res.success) {
-                    // Reset signup state to login mode
                     isSignUp = false;
                     signupStep = 1;
                     password = "";

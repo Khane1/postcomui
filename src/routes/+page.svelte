@@ -6,13 +6,22 @@
   import CategoryShowcase from "$lib/components/cards&grids/CategoryShowcase.svelte";
   import SubcategoryScroller from "$lib/components/cards&grids/SubcategoryScroller.svelte";
   import ProductCard from "$lib/components/cards&grids/ProductCard.svelte";
+  import { untrack } from "svelte";
 
+  $effect(() => {
+    // Untrack to prevent search query keystrokes from triggering home-page API fetches
+    untrack(() => {
+      appState.fetchProducts();
+    });
+    appState.fetchBanners();
+    appState.fetchWishlist();
+  });
   // Dynamic derivation: maps flat IDs array to reactive bool index map [5]
   let favoritedMap = $derived(
     appState.favorites.reduce((acc, id) => {
       acc[id] = true;
       return acc;
-    }, {})
+    }, {}),
   );
 
   let agroProducts = $derived(
@@ -60,16 +69,20 @@
 </script>
 
 <div class="flex flex-col gap-10 pb-16 select-none font-sans">
-  
   <div class="space-y-6">
     <SubcategoryScroller />
-    
+
     <!-- Sponsored Banner -->
     <div class="flex flex-col">
-      <span class="text-xs text-slate-400 font-light pb-1.5 select-none">Sponsored</span>
-      <div class="overflow-hidden rounded-2xl border border-slate-100 hover:shadow-xs transition-shadow duration-300">
+      <span class="text-xs text-slate-400 font-light pb-1.5 select-none"
+        >Sponsored</span
+      >
+      <div
+        class="overflow-hidden rounded-2xl border border-slate-100 hover:shadow-xs transition-shadow duration-300"
+      >
         <img
-          src={appState.banners[0]?.image ||
+          src={
+          // appState.banners[0]?.image ||
             "https://www.sliderrevolution.com/wp-content/uploads/2023/06/fashion-shop-header-slider-for-wordpress.gif"}
           onerror={(e) => {
             e.currentTarget.src =
@@ -83,7 +96,9 @@
 
     <!-- AISLE 1: FARM FRESH PRODUCE -->
     <div class="space-y-4 pt-4">
-      <div class="flex justify-between items-baseline border-b border-slate-100 pb-3">
+      <div
+        class="flex justify-between items-baseline border-b border-slate-100 pb-3"
+      >
         <div>
           <h3 class="text-lg font-bold text-slate-900 tracking-tight">
             Farm fresh produce
@@ -103,7 +118,9 @@
         </button>
       </div>
 
-      <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 sm:gap-4 2xl:grid-cols-6 xl:grid-cols-5 gap-3">
+      <div
+        class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 sm:gap-4 2xl:grid-cols-6 xl:grid-cols-5 gap-3"
+      >
         {#each agroProducts as product (product.id)}
           <div class="w-full">
             <ProductCard
@@ -124,7 +141,9 @@
   <!-- AISLE 2: STAPLES & SPECIALTY -->
   {#if foodBeverages.length > 0}
     <div class="space-y-4 pt-2">
-      <div class="flex justify-between items-baseline border-b border-slate-100 pb-3">
+      <div
+        class="flex justify-between items-baseline border-b border-slate-100 pb-3"
+      >
         <div>
           <h3 class="text-lg font-bold text-slate-900 tracking-tight">
             Food & staples
@@ -145,7 +164,9 @@
       </div>
 
       <!-- Horizontal scroll layout -->
-      <div class="flex gap-4 overflow-x-auto pb-4 scrollbar-none snap-x -mx-4 px-4 sm:mx-0 sm:px-0">
+      <div
+        class="flex gap-4 overflow-x-auto pb-4 scrollbar-none snap-x -mx-4 px-4 sm:mx-0 sm:px-0"
+      >
         {#each foodBeverages as product (product.id)}
           <div class="w-[170px] sm:w-[180px] shrink-0 snap-start">
             <ProductCard
@@ -164,7 +185,9 @@
   <!-- AISLE 3: ARTISAN & CULTURAL CRAFTS -->
   {#if artsCrafts.length > 0}
     <div class="space-y-4 pt-2">
-      <div class="flex justify-between items-baseline border-b border-slate-100 pb-3">
+      <div
+        class="flex justify-between items-baseline border-b border-slate-100 pb-3"
+      >
         <div>
           <h3 class="text-lg font-bold text-slate-900 tracking-tight">
             Artisan & cultural crafts
@@ -185,22 +208,63 @@
       </div>
 
       <!-- Horizontal Scroll Container -->
-      <div class="flex gap-4 overflow-x-auto pb-4 scrollbar-none snap-x -mx-4 px-4 sm:mx-0 sm:px-0">
-        
+      <div
+        class="flex gap-4 overflow-x-auto pb-4 scrollbar-none snap-x -mx-4 px-4 sm:mx-0 sm:px-0"
+      >
+        <!-- Sponsored Banner
+    <div class="flex flex-col">
+      <span class="text-xs text-slate-400 font-light pb-1.5 select-none">Sponsored</span>
+      <div class="overflow-hidden rounded-2xl border border-slate-100 hover:shadow-xs transition-shadow duration-300">
+        {#if appState.banners[0]}
+          {#if appState.banners[0].url}
+            <a href={appState.banners[0].url} class="block w-full h-full">
+              <img
+                src={appState.banners[0].image}
+                alt={appState.banners[0].caption || "Promo Banner"}
+                style="object-position: {appState.banners[0].bgPosition};"
+                class="text-3xl text-white h-48 md:h-96 w-full object-cover flex md:justify-start justify-center"
+              />
+            </a>
+          {:else}
+            <img
+              src={appState.banners[0].image}
+              alt={appState.banners[0].caption || "Promo Banner"}
+              style="object-position: {appState.banners[0].bgPosition};"
+              class="text-3xl text-white h-48 md:h-96 w-full object-cover flex md:justify-start justify-center"
+            />
+          {/if}
+        {:else}
+          <img
+            src="https://www.sliderrevolution.com/wp-content/uploads/2023/06/fashion-shop-header-slider-for-wordpress.gif"
+            alt="Promo Banner"
+            class="text-3xl text-white h-48 md:h-96 w-full object-cover flex md:justify-start justify-center"
+          />
+        {/if}
+      </div>
+    </div> -->
+      
         <!-- 1. Sponsored Ad (First in Scroll) -->
-        <div class="w-[240px] sm:w-[280px] shrink-0 snap-start flex flex-col gap-1.5">
+        <div
+          class="w-[240px] sm:w-[280px] shrink-0 snap-start flex flex-col gap-1.5"
+        >
           <div class="text-xs text-slate-400 font-light pl-1 select-none">
             Sponsored
           </div>
-          <div class="relative h-64 sm:h-[280px] w-full group overflow-hidden rounded-2xl border border-slate-100 hover:shadow-xs transition-shadow duration-300 bg-slate-50">
+          <div
+            class="relative h-64 sm:h-[280px] w-full group overflow-hidden rounded-2xl border border-slate-100 hover:shadow-xs transition-shadow duration-300 bg-slate-50"
+          >
             <img
               class="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
               src="https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExYTBnMDdscTA5ZzR5cnluZTR6NDhqcXxlNTV6aDFkanR0cmt5Z3BjOSZlcD12MV9naWZzX3JlbGF0ZWQmY3Q9Zw/XHX8QKQ5vXQnRZ32VI/giphy.gif"
               alt="Artisan Craft Ad"
             />
-            
-            <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/60 to-transparent">
-              <span class="text-white text-sm font-semibold">Heritage Collections</span>
+
+            <div
+              class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/60 to-transparent"
+            >
+              <span class="text-white text-sm font-semibold"
+                >Heritage Collections</span
+              >
             </div>
           </div>
         </div>

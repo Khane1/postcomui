@@ -16,10 +16,10 @@
   // Instacart Sidebar Menu Map (Aligned to Postcom categories)
   const primaryMenu = [
     { id: "All", label: "Home", type: "home", icon: "home" },
-    { id: "Brands", label: "Brands", type: "route", icon: "brands" },
+    // { id: "Brands", label: "Brands", type: "route", icon: "brands" },
     {
       id: "Agro Products",
-      label: "Grocery (Agro)",
+      label: "Grocery",
       type: "category",
       icon: "grocery",
     },
@@ -55,8 +55,8 @@
 
   // Handles navigation and automatically closes drawer on mobile
   function handleNavigate(item) {
+    appState.searchQuery=""
     appState.isSidebarOpen = false; // Smooth slide close on select
-
     if (item.type === "home") {
       onCategoryChange?.("All");
       goto("/");

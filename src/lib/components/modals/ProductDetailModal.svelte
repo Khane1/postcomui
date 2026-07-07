@@ -437,14 +437,9 @@
                 {/if}
               </div>
 
-              <div class="flex">
-                <!-- <span class="border border-red-500 text-red-500 text-[10px] font-black uppercase px-2 py-1 rounded flex items-center gap-1 select-none">
-                  🏷️ Discount of 1,500 UGX above 3 
-                </span> -->
-              </div>
-
+            
               <!-- Corrected template variable referencing variationsToShow -->
-              {#if variationsToShow.length > 0}
+              <!-- {#if variationsToShow.length > 0}
                 <div class="space-y-4 pt-3 border-t border-gray-100">
                   {#each variationsToShow as group}
                     <div class="space-y-2">
@@ -482,7 +477,7 @@
                     </div>
                   {/each}
                 </div>
-              {/if}
+              {/if} -->
               {#if product.stockStatus === "Many in stock"}
                 <div
                   class="flex items-center justify-between border border-gray-300 rounded-full overflow-hidden h-12"

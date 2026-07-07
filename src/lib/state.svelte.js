@@ -1,9 +1,9 @@
 // lib/state.svelte.js
 import { products as defaultProducts } from './data/products.js';
 import { publicApi, authApi, integrationApi, shippingApi } from './config/api.js';
-import { mapBackendProductToUI, mapBackendBrandToUI } from './utils/mappers.js';
+import { mapBackendProductToUI, mapBackendBrandToUI,resolveImageUrl } from './utils/mappers.js';
 import { goto } from '$app/navigation';
-
+// Import update
 class AppState {
   searchQuery = $state("");
   selectedCategory = $state("All");
@@ -13,6 +13,9 @@ class AppState {
   orders = $state([]);
   activeBranch = $state("Kampala GPO");
   selectedAddressId = $state(""); 
+
+  searchSuggestions = $state([]);
+  isSearchingSuggestions = $state(false);
 
   isLocationModalOpen = $state(false);
   isSidebarOpen = $state(false);
@@ -101,6 +104,47 @@ class AppState {
       }
       this.fetchRegions();
       this.fetchPickupCenters();
+    }
+  }
+
+  async fetchSearchSuggestions(query) {
+    if (!query.trim()) {
+      this.searchSuggestions = [];
+      return;
+    }
+    this.isSearchingSuggestions = true;
+    try {
+      const response = await publicApi.get('search/products', {
+        params: {
+          page: 1,
+          per_page: 5,
+          q: query
+        }
+      });
+      const data = response.data !== undefined ? response.data : response;
+      let rawList = [];
+      if (data) {
+        if (Array.isArray(data)) {
+          rawList = data;
+        } else if (data.hits && Array.isArray(data.hits)) {
+          rawList = data.hits;
+        } else if (data.content && Array.isArray(data.content)) {
+          rawList = data.content;
+        } else if (data.data && Array.isArray(data.data)) {
+          rawList = data.data;
+        }
+      }
+      this.searchSuggestions = rawList.slice(0, 5).map(hit => ({
+        id: hit.id,
+        label: hit.name || hit.label || "",
+        image: hit.front_image || hit.image || "",
+        raw: hit
+      }));
+    } catch (err) {
+      console.warn("[Autocomplete API] Failed to fetch search suggestions:", err);
+      this.searchSuggestions = [];
+    } finally {
+      this.isSearchingSuggestions = false;
     }
   }
 
@@ -608,7 +652,7 @@ class AppState {
         response = await publicApi.get('search/products', {
           params: {
             q: this.searchQuery,
-            per_page: 50,
+            per_page: 100,
             is_published: true
           }
         });
@@ -623,13 +667,14 @@ class AppState {
         });
       }
       
-      // Defensively support both Axios-wrapped and direct unwrapped responses
       const data = response.data !== undefined ? response.data : response;
       
       let rawList = [];
       if (data) {
         if (Array.isArray(data)) {
           rawList = data;
+        } else if (data.hits && Array.isArray(data.hits)) {
+          rawList = data.hits;
         } else if (data.content && Array.isArray(data.content)) {
           rawList = data.content;
         } else if (data.products && Array.isArray(data.products)) {
@@ -643,19 +688,49 @@ class AppState {
 
       this.allProducts = rawList.map(mapBackendProductToUI).filter(Boolean);
 
-      // Fallback to default local products if the database currently returns an empty set
-      if (this.allProducts.length === 0) {
+      // Fallback to default local products ONLY when no search query is active
+      if (this.allProducts.length === 0 && !this.searchQuery) {
         this.allProducts = defaultProducts;
       }
     } catch (err) {
       console.warn("[Products State] Failed to load from API. Falling back to local data.", err);
-      this.allProducts = defaultProducts;
+      if (!this.searchQuery) {
+        this.allProducts = defaultProducts;
+      } else {
+        this.allProducts = []; // Maintain empty result state for failed API queries
+      }
     } finally {
       this.isLoading = false;
     }
   }
 
- async fetchBanners() {
+  async fetchShippingCountries() {
+    try {
+      const response = await publicApi.get('deliveries/shipping-destinations', { params: { per_page: 100 } });
+      const data = response.data !== undefined ? response.data : response;
+      let rawCountries = [];
+      if (data) {
+        if (Array.isArray(data)) {
+          rawCountries = data;
+        } else if (data.content && Array.isArray(data.content)) {
+          rawCountries = data.content;
+        } else if (data.data && Array.isArray(data.data)) {
+          rawCountries = data.data;
+        }
+      }
+      this.shippingCountries = rawCountries.map(c => ({
+        id: String(c.id || c.value || ""),
+        label: c.label || c.name || c.country || ""
+      })).filter(c => c.id);
+      console.log("[Shipping Countries State] Loaded shipping destinations:", this.shippingCountries);
+    } catch (err) {
+      console.warn("Could not load shipping destinations list.", err);
+      this.shippingCountries = [];
+    }
+  }
+
+// Method update
+  async fetchBanners() {
     try {
       const response = await publicApi.get('banners');
       const data = response.data !== undefined ? response.data : response;
@@ -672,7 +747,13 @@ class AppState {
           rawList = data.data;
         }
       }
-      this.banners = rawList;
+      this.banners = rawList.map(b => ({
+        id: b.id,
+        image: resolveImageUrl(b.image),
+        caption: b.caption || b.alt || "",
+        url: b.url || "",
+        bgPosition: b.bgPosition || b.bg_position || 'center center'
+      }));
     } catch (err) {
       this.banners = [];
     }
