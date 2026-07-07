@@ -50,6 +50,7 @@ export function normalizeCategory(item) {
 // Complete mapBackendProductToUI mapping function inside lib/utils/mappers.js
 export function mapBackendProductToUI(item) {
   if (!item) return null;
+  if (!item.id && !item.name) return null;
 
   // 1. Extract the distinct image parameters from backend payload
   let rawImages = [];

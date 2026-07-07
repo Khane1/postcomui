@@ -100,16 +100,31 @@ routes/
       +page.svelte
     +layout.svelte
     +page.svelte
+  api/
+    maps/
+      geocode/
+        +server.js
+      key/
+        +server.js
+    shipping/
+      [...path]/
+        +server.js
+    v1/
+      [...path]/
+        +server.js
   brands/
     +page.svelte
   cart/
     +page.svelte
   products/
     +page.svelte
+  refund-and-return-policy/
+    +page.svelte
   +layout.svelte
   +page.svelte
   layout.css
 app.html
+hooks.server.js
 </directory_structure>
 
 <files>
@@ -143,8 +158,11 @@ This section contains the contents of the repository's files.
     let password = $state("");
     let confirmPassword = $state("");
     let otpValue = $state("");
-
+    async function handleGoogleLogin(){
+        
+    }
     // Handle form submissions
+   // Handle form submissions
     async function handleAuthSubmit(event) {
         event.preventDefault();
 
@@ -159,10 +177,14 @@ This section contains the contents of the repository's files.
                 const res = await appState.signUp(firstName, lastName, email, phone);
                 isLoading = false;
                 if (res.success) {
-                    signupStep = 2; // Move to OTP
+                    appState.addToast("Account registered successfully! Please sign in.", "success");
+                    isSignUp = false; // Toggle view back to Sign In
+                    signupStep = 1;
+                    password = "";
+                    confirmPassword = "";
                 }
             } 
-            // STEP 2: OTP CODE VALIDATION
+            // STEP 2: OTP CODE VALIDATION (Retained for validation safety)
             else if (signupStep === 2) {
                 if (!otpValue.trim()) {
                     appState.addToast("Please enter the verification code.", "error");
@@ -172,10 +194,10 @@ This section contains the contents of the repository's files.
                 const res = await appState.verifyOtpCode(otpValue);
                 isLoading = false;
                 if (res.success) {
-                    signupStep = 3; // Move to Password Set
+                    signupStep = 3;
                 }
             } 
-            // STEP 3: PASSWORD SETTING & REGISTRATION COMPLETION
+            // STEP 3: PASSWORD SETTING (Retained for validation safety)
             else if (signupStep === 3) {
                 if (!password || !confirmPassword) {
                     appState.addToast("Password values cannot be empty.", "error");
@@ -189,7 +211,6 @@ This section contains the contents of the repository's files.
                 const res = await appState.setPassword(password, confirmPassword);
                 isLoading = false;
                 if (res.success) {
-                    // Reset signup state to login mode
                     isSignUp = false;
                     signupStep = 1;
                     password = "";
@@ -3268,8 +3289,6 @@ This section contains the contents of the repository's files.
   let selectedLat = $state(0.3476);
   let selectedLng = $state(32.5825);
 
-  const GOOGLE_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "";
-
   $effect(() => {
     if (locationSearchQuery.trim() && window.google) {
       const autocompleteService = new google.maps.places.AutocompleteService();
@@ -3301,13 +3320,13 @@ This section contains the contents of the repository's files.
   async function reverseGeocodeAddress(lat, lng) {
     try {
       const response = await fetch(
-        `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${GOOGLE_API_KEY}`,
+        `/api/maps/geocode?lat=${lat}&lng=${lng}`,
       );
       const data = await response.json();
       if (data.results && data.results.length > 0) {
         const address = data.results[0].formatted_address;
         resolvedUserAddress = address;
-        tempSelectedAddress = address; // Set temporary preview selection
+        tempSelectedAddress = address;
         appState.addToast(`Located near: ${address}`);
       }
     } catch (err) {
@@ -4174,14 +4193,9 @@ This section contains the contents of the repository's files.
                 {/if}
               </div>
 
-              <div class="flex">
-                <!-- <span class="border border-red-500 text-red-500 text-[10px] font-black uppercase px-2 py-1 rounded flex items-center gap-1 select-none">
-                  🏷️ Discount of 1,500 UGX above 3 
-                </span> -->
-              </div>
-
+            
               <!-- Corrected template variable referencing variationsToShow -->
-              {#if variationsToShow.length > 0}
+              <!-- {#if variationsToShow.length > 0}
                 <div class="space-y-4 pt-3 border-t border-gray-100">
                   {#each variationsToShow as group}
                     <div class="space-y-2">
@@ -4219,7 +4233,7 @@ This section contains the contents of the repository's files.
                     </div>
                   {/each}
                 </div>
-              {/if}
+              {/if} -->
               {#if product.stockStatus === "Many in stock"}
                 <div
                   class="flex items-center justify-between border border-gray-300 rounded-full overflow-hidden h-12"
@@ -4956,7 +4970,7 @@ This section contains the contents of the repository's files.
     // { id: "Brands", label: "Brands", type: "route", icon: "brands" },
     {
       id: "Agro Products",
-      label: "Grocery (Agro)",
+      label: "Grocery",
       type: "category",
       icon: "grocery",
     },
@@ -4992,8 +5006,8 @@ This section contains the contents of the repository's files.
 
   // Handles navigation and automatically closes drawer on mobile
   function handleNavigate(item) {
+    appState.searchQuery=""
     appState.isSidebarOpen = false; // Smooth slide close on select
-
     if (item.type === "home") {
       onCategoryChange?.("All");
       goto("/");
@@ -5245,14 +5259,7 @@ This section contains the contents of the repository's files.
 </file>
 
 <file path="lib/config/api.js">
-// Inside lib/config/api.js [5]
 import axios from 'axios';
-
-const BASE_URL = import.meta.env.VITE_APP_BASE_URL || '';
-const EPOSTA_URL = import.meta.env.VITE_APP_EPOSTA_URL || '';
-const SHIPPING_URL = import.meta.env.VITE_APP_SHIPPING_URL || '';
-const API_KEY = import.meta.env.VITE_APP_API_KEY || '';
-const API_SECRET = import.meta.env.VITE_APP_API_SECRET || '';
 
 const SKIP_REFRESH_ENDPOINTS = [
   '/auth/login',
@@ -5269,26 +5276,13 @@ function shouldSkipRefresh(url) {
 }
 
 export const publicApi = axios.create({
-  baseURL: `${BASE_URL}/api/v1`,
+  baseURL: '/api/v1',
   withCredentials: true
 });
 
 export const authApi = axios.create({
-  baseURL: `${BASE_URL}/api/v1`,
+  baseURL: '/api/v1',
   withCredentials: true,
-});
-
-export const integrationApi = axios.create({
-  baseURL: `${EPOSTA_URL}/api/v1`
-});
-
-export const shippingApi = axios.create({
-  baseURL: `${SHIPPING_URL}/api/v1`,
-  withCredentials: true,
-  headers: {
-    'api-key': API_KEY,
-    'api-secret': API_SECRET
-  }
 });
 
 let isRefreshing = false;
@@ -5305,7 +5299,6 @@ const processQueue = (error, token = null) => {
   failedQueue = [];
 };
 
-// FIXED: Parses Bearer access_token from the "credentials" JSON object
 const addTokenInterceptor = (config) => {
   if (typeof window !== 'undefined') {
     const credsStr = sessionStorage.getItem('credentials');
@@ -5325,9 +5318,7 @@ const addTokenInterceptor = (config) => {
 };
 
 authApi.interceptors.request.use(addTokenInterceptor, (err) => Promise.reject(err));
-shippingApi.interceptors.request.use(addTokenInterceptor, (err) => Promise.reject(err));
 
-// FIXED: Manages the auto-refresh loop using the nested refresh_token properties
 authApi.interceptors.response.use(
   (response) => response,
   async (error) => {
@@ -5364,7 +5355,6 @@ authApi.interceptors.response.use(
         const { access_token, refresh_token } = response.data;
         
         if (access_token) {
-          // Write updated credentials block back to sessionStorage
           const updatedCredentials = {
             access_token,
             refresh_token: refresh_token || refreshToken
@@ -5791,6 +5781,7 @@ export function normalizeCategory(item) {
 // Complete mapBackendProductToUI mapping function inside lib/utils/mappers.js
 export function mapBackendProductToUI(item) {
   if (!item) return null;
+  if (!item.id && !item.name) return null;
 
   // 1. Extract the distinct image parameters from backend payload
   let rawImages = [];
@@ -5967,11 +5958,10 @@ export const stations = [
 
 <file path="lib/state.svelte.js">
 // lib/state.svelte.js
-import { products as defaultProducts } from './data/products.js';
-import { publicApi, authApi, integrationApi, shippingApi } from './config/api.js';
-import { mapBackendProductToUI, mapBackendBrandToUI } from './utils/mappers.js';
+import { publicApi, authApi } from './config/api.js';
+import { mapBackendProductToUI, mapBackendBrandToUI,resolveImageUrl } from './utils/mappers.js';
 import { goto } from '$app/navigation';
-
+// Import update
 class AppState {
   searchQuery = $state("");
   selectedCategory = $state("All");
@@ -5981,6 +5971,9 @@ class AppState {
   orders = $state([]);
   activeBranch = $state("Kampala GPO");
   selectedAddressId = $state(""); 
+
+  searchSuggestions = $state([]);
+  isSearchingSuggestions = $state(false);
 
   isLocationModalOpen = $state(false);
   isSidebarOpen = $state(false);
@@ -6008,6 +6001,9 @@ class AppState {
   brands = $state([]);
   banners = $state([]);
   isLoading = $state(false);
+
+  _productsInFlight = false;
+  _bannersInFlight = false;
 
   get cartCount() {
     return this.cartItems.reduce((acc, item) => acc + item.quantity, 0);
@@ -6072,6 +6068,47 @@ class AppState {
     }
   }
 
+  async fetchSearchSuggestions(query) {
+    if (!query.trim()) {
+      this.searchSuggestions = [];
+      return;
+    }
+    this.isSearchingSuggestions = true;
+    try {
+      const response = await publicApi.get('search/products', {
+        params: {
+          page: 1,
+          per_page: 5,
+          q: query
+        }
+      });
+      const data = response.data !== undefined ? response.data : response;
+      let rawList = [];
+      if (data) {
+        if (Array.isArray(data)) {
+          rawList = data;
+        } else if (data.hits && Array.isArray(data.hits)) {
+          rawList = data.hits;
+        } else if (data.content && Array.isArray(data.content)) {
+          rawList = data.content;
+        } else if (data.data && Array.isArray(data.data)) {
+          rawList = data.data;
+        }
+      }
+      this.searchSuggestions = rawList.slice(0, 5).map(hit => ({
+        id: hit.id,
+        label: hit.name || hit.label || "",
+        image: hit.front_image || hit.image || "",
+        raw: hit
+      }));
+    } catch (err) {
+      console.warn("[Autocomplete API] Failed to fetch search suggestions:", err);
+      this.searchSuggestions = [];
+    } finally {
+      this.isSearchingSuggestions = false;
+    }
+  }
+
   // GET /api/v1/wishlist - Loads and maps all wishlist products [5]
   async fetchWishlist() {
     if (!this.isLoggedIn) return;
@@ -6132,7 +6169,6 @@ class AppState {
     } else {
       this.favorites = [...(this.favorites || []), productId];
       const matchedProduct = this.allProducts.find(p => p.id === productId) || 
-                            defaultProducts.find(p => p.id === productId) || 
                             { id: productId, name: "Loading...", price: 0, images: [] };
       this.wishlistProducts = [...(this.wishlistProducts || []), matchedProduct];
       this.addToast("Saved item to Favorites");
@@ -6297,7 +6333,7 @@ class AppState {
    async fetchProfile() {
     try {
       const profileResponse = await authApi.get('auth/profile');
-      const profileData = profileResponse.data !== undefined ? response.data : response;
+      const profileData = profileResponse.data !== undefined ? profileResponse.data : profileResponse;
 
       // Fetch extended customer records to acquire customer ID
       const customerData = await this.getCurrentUser();
@@ -6349,13 +6385,11 @@ class AppState {
         marketing_preferences: marketingPreferences ? 'true' : 'false' // Matches stringified boolean parameter
       };
       
-      alert(JSON.stringify(payload))
       const response = await authApi.post('customers', payload);
       this.addToast("Onboarding profile setup completed!");
       await this.fetchProfile();
       return { success: true, data: response.data };
     } catch (err) {
-      alert(JSON.stringify(err.response))
       const message = err.response?.data?.message || "Profile completion failed.";
       this.addToast(message, "error");
       return { success: false, error: message };
@@ -6569,80 +6603,97 @@ class AppState {
   // }
 
   async fetchProducts() {
+    if (this._productsInFlight) return;
+    this._productsInFlight = true;
     this.isLoading = true;
+
     try {
-      let response;
-      if (this.searchQuery) {
-        response = await publicApi.get('search/products', {
-          params: {
-            q: this.searchQuery,
-            per_page: 50,
-            is_published: true
-          }
-        });
-      } else {
-        response = await publicApi.get('products', {
-          params: {
-            page: 1,
-            perPage: 100,
-            is_published: true,
-            category_id: this.selectedCategory !== 'All' ? this.selectedCategory : undefined
-          }
-        });
-      }
-      
-      // Defensively support both Axios-wrapped and direct unwrapped responses
+      const params = this.searchQuery
+        ? { q: this.searchQuery, per_page: 100, is_published: true }
+        : { page: 1, perPage: 100, is_published: true,
+            category_id: this.selectedCategory !== 'All' ? this.selectedCategory : undefined };
+
+      const endpoint = this.searchQuery ? 'search/products' : 'products';
+      const response = await publicApi.get(endpoint, { params, timeout: 15000 });
       const data = response.data !== undefined ? response.data : response;
-      
+
       let rawList = [];
       if (data) {
-        if (Array.isArray(data)) {
-          rawList = data;
-        } else if (data.content && Array.isArray(data.content)) {
-          rawList = data.content;
-        } else if (data.products && Array.isArray(data.products)) {
-          rawList = data.products;
-        } else if (data.data && Array.isArray(data.data)) {
-          rawList = data.data;
-        } else if (data.items && Array.isArray(data.items)) {
-          rawList = data.items;
-        }
+        if (Array.isArray(data)) rawList = data;
+        else if (data.hits && Array.isArray(data.hits)) rawList = data.hits;
+        else if (data.content && Array.isArray(data.content)) rawList = data.content;
+        else if (data.products && Array.isArray(data.products)) rawList = data.products;
+        else if (data.data && Array.isArray(data.data)) rawList = data.data;
+        else if (data.items && Array.isArray(data.items)) rawList = data.items;
       }
 
-      this.allProducts = rawList.map(mapBackendProductToUI).filter(Boolean);
-
-      // Fallback to default local products if the database currently returns an empty set
-      if (this.allProducts.length === 0) {
-        this.allProducts = defaultProducts;
-      }
+      const mapped = rawList.map(mapBackendProductToUI).filter(Boolean);
+      const seen = new Set();
+      this.allProducts = mapped.filter(p => {
+        if (!p.id || seen.has(p.id)) return false;
+        seen.add(p.id);
+        return true;
+      });
     } catch (err) {
-      console.warn("[Products State] Failed to load from API. Falling back to local data.", err);
-      this.allProducts = defaultProducts;
+      console.warn("[Products State] API failed.", err);
+      this.allProducts = [];
     } finally {
       this.isLoading = false;
+      this._productsInFlight = false;
     }
   }
 
- async fetchBanners() {
+  async fetchShippingCountries() {
     try {
-      const response = await publicApi.get('banners');
+      const response = await publicApi.get('deliveries/shipping-destinations', { params: { per_page: 100 } });
+      const data = response.data !== undefined ? response.data : response;
+      let rawCountries = [];
+      if (data) {
+        if (Array.isArray(data)) {
+          rawCountries = data;
+        } else if (data.content && Array.isArray(data.content)) {
+          rawCountries = data.content;
+        } else if (data.data && Array.isArray(data.data)) {
+          rawCountries = data.data;
+        }
+      }
+      this.shippingCountries = rawCountries.map(c => ({
+        id: String(c.id || c.value || ""),
+        label: c.label || c.name || c.country || ""
+      })).filter(c => c.id);
+      console.log("[Shipping Countries State] Loaded shipping destinations:", this.shippingCountries);
+    } catch (err) {
+      console.warn("Could not load shipping destinations list.", err);
+      this.shippingCountries = [];
+    }
+  }
+
+// Method update
+  async fetchBanners() {
+    if (this._bannersInFlight || this.banners.length > 0) return;
+    this._bannersInFlight = true;
+    try {
+      const response = await publicApi.get('banners', { timeout: 15000 });
       const data = response.data !== undefined ? response.data : response;
       
       let rawList = [];
       if (data) {
-        if (Array.isArray(data)) {
-          rawList = data;
-        } else if (data.content && Array.isArray(data.content)) {
-          rawList = data.content;
-        } else if (data.banners && Array.isArray(data.banners)) {
-          rawList = data.banners;
-        } else if (data.data && Array.isArray(data.data)) {
-          rawList = data.data;
-        }
+        if (Array.isArray(data)) rawList = data;
+        else if (data.content && Array.isArray(data.content)) rawList = data.content;
+        else if (data.banners && Array.isArray(data.banners)) rawList = data.banners;
+        else if (data.data && Array.isArray(data.data)) rawList = data.data;
       }
-      this.banners = rawList;
+      this.banners = rawList.map(b => ({
+        id: b.id,
+        image: resolveImageUrl(b.image),
+        caption: b.caption || b.alt || "",
+        url: b.url || "",
+        bgPosition: b.bgPosition || b.bg_position || 'center center'
+      }));
     } catch (err) {
       this.banners = [];
+    } finally {
+      this._bannersInFlight = false;
     }
   }
 
@@ -6901,9 +6952,9 @@ class AppState {
         sessionStorage.setItem('accessToken', res.data.accessToken);
         await this.syncCartItems();
       }
-      return true;
+      return { success: true, data: res.data };
     } catch (err) {
-      return true;
+      return { success: false, error: err.response?.data?.message || 'OTP verification failed' };
     }
   }
 
@@ -7009,50 +7060,19 @@ class AppState {
     if (!this.isLoggedIn) return;
     this.isLoading = true;
     try {
-      // Step 1: Discover flat order lines with highly robust parameter overrides to bypass backend limits
       const response = await authApi.get('orders/customer', {
-        params: {
-          page: 1,
-          per_page: 100,   // Standard REST snake_case
-          perPage: 100,    // CamelCase override
-          limit: 100,      // SQL-based pagination override
-          size: 100        // Spring Boot Pageable override
-        }
+        params: { page: 1, per_page: 100 }
       });
       const data = response.data !== undefined ? response.data : response;
 
       let flatList = [];
       if (data) {
-        if (Array.isArray(data)) {
-          flatList = data;
-        } else if (data.content && Array.isArray(data.content)) {
-          flatList = data.content;
-        } else if (data.data && Array.isArray(data.data)) {
-          flatList = data.data;
-        }
+        if (Array.isArray(data)) flatList = data;
+        else if (data.content && Array.isArray(data.content)) flatList = data.content;
+        else if (data.data && Array.isArray(data.data)) flatList = data.data;
       }
 
-      const uniqueIds = [...new Set(flatList.map(item => item.order_id || item.id).filter(Boolean))];
-
-      // Step 2: Fetch full detailed structure in parallel with automated error-recovery [1]
-      const detailedOrders = await Promise.all(
-        uniqueIds.map(async (id) => {
-          try {
-            const res = await authApi.get(`orders/${id}`);
-            const orderData = res.data !== undefined ? res.data : res;
-            return orderData;
-          } catch (err) {
-            console.warn(`[Orders State] Enriching details failed for order ID: ${id}. Recovering fallback.`, err);
-            
-            // Fallback recovery: preserve the order from flatList so it is not dropped
-            const fallbackItem = flatList.find(item => (item.order_id || item.id) === id);
-            return fallbackItem || null;
-          }
-        })
-      );
-
-      this.orders = detailedOrders.filter(Boolean);
-      console.log("[Orders State] Synced customer order list successfully:", this.orders);
+      this.orders = flatList.filter(Boolean);
     } catch (err) {
       console.warn("Could not retrieve customer orders.", err);
       this.orders = [];
@@ -7408,7 +7428,7 @@ export const appState = new AppState();
   }
 </script>
 
-<div class="max-w-2xl text-slate-900 py-6 select-none flex flex-col gap-6">
+<div class="max-w-2xl xl:max-w-full text-slate-900 py-6 select-none flex flex-col gap-6">
   <!-- Section Header -->
   <div class="border-b border-slate-100 pb-4">
     <h2 class="text-[22px] font-bold text-slate-900 tracking-tight">Favorites</h2>
@@ -7440,7 +7460,7 @@ export const appState = new AppState();
     </div>
   {:else}
     <!-- Product Grid -->
-    <div class="grid grid-cols-2 sm:grid-cols-3 gap-4 animate-in fade-in duration-200">
+    <div class="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-8 gap-4 animate-in fade-in duration-200">
       {#each favoritedProductsList as product (product.id)}
         <div class="w-full">
           <ProductCard 
@@ -7940,7 +7960,7 @@ export const appState = new AppState();
       </div>
 
       <div class="divide-y divide-gray-100">
-        {#each appState.mappedOrders as order, index (order?.id || order?.reference || index)}
+        {#each appState.mappedOrders as order, index (order?.id ?? (order?.reference ? `${order.reference}-${index}` : index))}
           {@const statusConf = status(order?.status)}
           {@const isExpanded = expandedOrderId === (order.id ?? index)}
           {@const itemCount = order?.order_items?.length || 0}
@@ -8040,7 +8060,7 @@ export const appState = new AppState();
                   <div class="bg-white border border-gray-100 rounded-2xl p-4">
                     <p class="text-[12.5px] font-bold text-gray-500 mb-2">Items</p>
                     <div class="flex flex-col divide-y divide-gray-100">
-                      {#each order?.order_items || [] as item, itemIndex (item?.id || item?.product_id || itemIndex)}
+                      {#each order?.order_items || [] as item, itemIndex (item?.id || itemIndex)}
                         {@const price = Number(item.price || 0)}
                         <div class="py-3 flex items-center justify-between gap-4 first:pt-0 last:pb-0">
                           <div class="flex items-center gap-3 min-w-0">
@@ -9094,6 +9114,203 @@ export const appState = new AppState();
 </div>
 </file>
 
+<file path="routes/api/maps/geocode/+server.js">
+const GOOGLE_MAPS_API_KEY = process.env.PRIVATE_GOOGLE_MAPS_API_KEY || '';
+
+export async function GET({ url }) {
+  const lat = url.searchParams.get('lat');
+  const lng = url.searchParams.get('lng');
+
+  if (!lat || !lng) {
+    return new Response(JSON.stringify({ error: 'lat and lng query params required' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+
+  const targetUrl = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${GOOGLE_MAPS_API_KEY}`;
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+
+    const response = await fetch(targetUrl, { signal: controller.signal });
+    clearTimeout(timeout);
+
+    const data = await response.json();
+
+    return new Response(JSON.stringify(data), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  } catch (err) {
+    console.error('[Maps Proxy] Geocode request failed:', err.message);
+    return new Response(JSON.stringify({ error: 'Geocoding service unavailable' }), {
+      status: 502,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+}
+</file>
+
+<file path="routes/api/maps/key/+server.js">
+import { json } from '@sveltejs/kit';
+
+export function GET() {
+  const key = process.env.PRIVATE_GOOGLE_MAPS_API_KEY || '';
+  return json({ key });
+}
+</file>
+
+<file path="routes/api/shipping/[...path]/+server.js">
+const SHIPPING_URL = process.env.PRIVATE_APP_SHIPPING_URL || 'https://sandbox-api.eposta.ug/third-party/api/nationality';
+const API_KEY = process.env.PRIVATE_APP_API_KEY || '';
+const API_SECRET = process.env.PRIVATE_APP_API_SECRET || '';
+
+export async function GET({ params, request }) {
+  return proxyShippingRequest(params.path, request, 'GET');
+}
+
+export async function POST({ params, request }) {
+  return proxyShippingRequest(params.path, request, 'POST');
+}
+
+async function proxyShippingRequest(path, request, method) {
+  const url = new URL(request.url);
+  const targetUrl = `${SHIPPING_URL}/${path}${url.search}`;
+
+  const headers = new Headers();
+  headers.set('api-key', API_KEY);
+  headers.set('api-secret', API_SECRET);
+  headers.set('content-type', request.headers.get('content-type') || 'application/json');
+
+  const cookie = request.headers.get('cookie');
+  if (cookie) {
+    headers.set('cookie', cookie);
+  }
+
+  const authHeader = request.headers.get('authorization');
+  if (authHeader) {
+    headers.set('authorization', authHeader);
+  }
+
+  const init = { method, headers, redirect: 'follow' };
+
+  if (method !== 'GET' && method !== 'HEAD') {
+    init.body = await request.arrayBuffer();
+  }
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    init.signal = controller.signal;
+
+    const response = await fetch(targetUrl, init);
+    clearTimeout(timeout);
+
+    const responseHeaders = new Headers();
+    for (const [key, value] of response.headers) {
+      if (!['transfer-encoding', 'content-encoding'].includes(key.toLowerCase())) {
+        responseHeaders.set(key, value);
+      }
+    }
+
+    return new Response(response.body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers: responseHeaders
+    });
+  } catch (err) {
+    console.error(`[Shipping Proxy] ${method} /api/shipping/${path} failed:`, err.message);
+    return new Response(JSON.stringify({ message: 'Shipping service unavailable' }), {
+      status: 502,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+}
+</file>
+
+<file path="routes/api/v1/[...path]/+server.js">
+const BACKEND_URL = process.env.PRIVATE_APP_BASE_URL || 'https://api.postcom.labs.eposta.ug';
+
+export async function GET({ params, request }) {
+  return proxyRequest(params.path, request, 'GET');
+}
+
+export async function POST({ params, request }) {
+  return proxyRequest(params.path, request, 'POST');
+}
+
+export async function PUT({ params, request }) {
+  return proxyRequest(params.path, request, 'PUT');
+}
+
+export async function DELETE({ params, request }) {
+  return proxyRequest(params.path, request, 'DELETE');
+}
+
+export async function PATCH({ params, request }) {
+  return proxyRequest(params.path, request, 'PATCH');
+}
+
+async function proxyRequest(path, request, method) {
+  const url = new URL(request.url);
+  const targetUrl = `${BACKEND_URL}/api/v1/${path}${url.search}`;
+
+  const headers = new Headers();
+  const skipHeaders = ['host', 'connection', 'origin', 'referer', 'cookie', 'accept-encoding'];
+
+  for (const [key, value] of request.headers) {
+    if (!skipHeaders.includes(key.toLowerCase())) {
+      headers.set(key, value);
+    }
+  }
+
+  const cookie = request.headers.get('cookie');
+  if (cookie) {
+    headers.set('cookie', cookie);
+  }
+
+  const init = {
+    method,
+    headers,
+    redirect: 'follow'
+  };
+
+  if (method !== 'GET' && method !== 'HEAD') {
+    init.body = await request.arrayBuffer();
+  }
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    init.signal = controller.signal;
+
+    const response = await fetch(targetUrl, init);
+    clearTimeout(timeout);
+
+    const responseHeaders = new Headers();
+    for (const [key, value] of response.headers) {
+      if (!['transfer-encoding', 'content-encoding'].includes(key.toLowerCase())) {
+        responseHeaders.set(key, value);
+      }
+    }
+
+    return new Response(response.body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers: responseHeaders
+    });
+  } catch (err) {
+    console.error(`[API Proxy] ${method} /api/v1/${path} failed:`, err.message);
+    return new Response(JSON.stringify({ message: 'Backend service unavailable' }), {
+      status: 502,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+}
+</file>
+
 <file path="routes/brands/+page.svelte">
 <!-- routes/account/brands/+page.svelte -->
 <script>
@@ -9343,6 +9560,17 @@ style="transform: rotate({-design.rotate}deg)"
   let cardExpiry = $state("");
   let cardCvv = $state("");
 
+  // International Shipping Input Fields
+  let selectedShippingDestinationId = $state("");
+  let selectedShippingDestinationName = $state("");
+  let receiverNameInput = $state("");
+  let receiverAddressInput = $state("");
+  let receiverPhoneInput = $state("");
+  let receiverCityInput = $state("");
+  let receiverStateInput = $state("");
+  let receiverZipInput = $state("");
+  let shippingNotesInput = $state("");
+
   let subtotal = $derived(
     appState.cartItems.reduce((acc, item) => {
       const price = Number(item?.product?.price || 0);
@@ -9351,8 +9579,8 @@ style="transform: rotate({-design.rotate}deg)"
     }, 0),
   );
 
-  let hasDelivery = $derived(
-    appState.cartItems.some((item) => item.fulfillment === "delivery"),
+  let fulfillmentMode = $derived(
+    appState.cartItems[0]?.fulfillment || "pickup"
   );
 
   let total = $derived(subtotal + shippingFee);
@@ -9368,7 +9596,6 @@ style="transform: rotate({-design.rotate}deg)"
     ) {
       return null;
     }
-    // Filter out human-readable labels (like "Kampala GPO")
     if (s.includes(" ") || (s.match(/[A-Z]/) && !s.match(/[a-f]/i))) {
       return null;
     }
@@ -9379,11 +9606,29 @@ style="transform: rotate({-design.rotate}deg)"
     appState.fetchPaymentMethods();
     appState.fetchCustomerAddresses();
     appState.fetchPickupCenters();
+    appState.fetchShippingCountries();
 
     // Populate profile phone coordinates
     const user = await appState.getCurrentUser();
     if (user && user.phone_number) {
       phoneNumberInput = user.phone_number;
+    }
+  });
+
+  // Watcher effect for auto-filling destination label
+  $effect(() => {
+    const selected = appState.shippingCountries.find(d => d.id === selectedShippingDestinationId);
+    selectedShippingDestinationName = selected?.label || '';
+  });
+
+  $effect(() => {
+    if (appState.user) {
+      if (!receiverNameInput) {
+        receiverNameInput = `${appState.user.first_name || ""} ${appState.user.last_name || ""}`.trim();
+      }
+      if (!receiverPhoneInput) {
+        receiverPhoneInput = appState.user.phone_number || "";
+      }
     }
   });
 
@@ -9397,7 +9642,7 @@ style="transform: rotate({-design.rotate}deg)"
     }
   });
 
-  // Calculate fees safely - only polling once UUIDs are resolved
+  // Calculate delivery fees reactively
   $effect(() => {
     async function calculateFee() {
       if (appState.cartItems.length === 0) {
@@ -9411,31 +9656,47 @@ style="transform: rotate({-design.rotate}deg)"
       }, 0);
       const packageWeightKg = Math.max(0.5, totalGrams / 1000);
 
+      // Handle International Shipping Option
+      if (fulfillmentMode === 'shipping') {
+        if (!selectedShippingDestinationId) {
+          shippingFee = 0;
+          return;
+        }
+        const payload = {
+          delivery_method: "SHIPPING",
+          package_weight: packageWeightKg,
+          shipping_destination_id: selectedShippingDestinationId
+        };
+        const fee = await appState.getDeliveryFee(payload);
+        shippingFee = fee;
+        return;
+      }
+
+      // Handle GPO Station Pickups and Domestic Deliveries
       const activeCenter = appState.allPickUpCenters.find(
         (c) =>
           c.name === appState.activeBranch ||
           String(c.id) === String(appState.activeBranch),
       );
 
-      const cleanAddrId = hasDelivery
+      const cleanAddrId = fulfillmentMode === 'delivery'
         ? sanitizeUuid(appState.selectedAddressId)
         : null;
-      const cleanCenterId = !hasDelivery
+      const cleanCenterId = fulfillmentMode === 'pickup'
         ? sanitizeUuid(activeCenter?.id)
         : null;
 
-      // Defensive check: Do not execute network requests until critical UUID parameters resolve
-      if (hasDelivery && !cleanAddrId) {
+      if (fulfillmentMode === 'delivery' && !cleanAddrId) {
         shippingFee = 5500; // Static fallback
         return;
       }
-      if (!hasDelivery && !cleanCenterId) {
+      if (fulfillmentMode === 'pickup' && !cleanCenterId) {
         shippingFee = 0; // Free pickup fallback
         return;
       }
 
       const payload = {
-        delivery_method: hasDelivery ? "DOOR_DELIVERY" : "PICKUP_STATION",
+        delivery_method: fulfillmentMode === 'delivery' ? "DOOR_DELIVERY" : "PICKUP_STATION",
         package_weight: packageWeightKg,
         delivery_address_id: cleanAddrId,
         pickup_center_id: cleanCenterId,
@@ -9527,62 +9788,72 @@ style="transform: rotate({-design.rotate}deg)"
         : nameLower.includes("airtel");
     });
 
-    const activeCenter = appState.allPickUpCenters.find(
-      (c) =>
-        c.name === appState.activeBranch ||
-        String(c.id) === String(appState.activeBranch),
-    );
+    let cleanAddrId = null;
+    let cleanCenterId = null;
+    let cleanDestId = null;
+    let deliveryMethod = "PICKUP_STATION";
+
+    if (fulfillmentMode === 'delivery') {
+      cleanAddrId = sanitizeUuid(appState.selectedAddressId);
+      deliveryMethod = "DOOR_DELIVERY";
+    } else if (fulfillmentMode === 'pickup') {
+      const activeCenter = appState.allPickUpCenters.find(
+        (c) => c.name === appState.activeBranch || String(c.id) === String(appState.activeBranch),
+      );
+      cleanCenterId = sanitizeUuid(activeCenter?.id);
+      deliveryMethod = "PICKUP_STATION";
+    } else if (fulfillmentMode === 'shipping') {
+      cleanDestId = selectedShippingDestinationId;
+      deliveryMethod = "SHIPPING";
+    }
+
+    // Validation checks for each mode
+    if (fulfillmentMode === 'delivery' && !cleanAddrId) {
+      appState.addToast("Please select or add a delivery address to complete your order.", "error");
+      return;
+    }
+    if (fulfillmentMode === 'pickup' && !cleanCenterId) {
+      appState.addToast("Retrieving pickup center parameters. Please wait...", "info");
+      return;
+    }
+    if (fulfillmentMode === 'shipping') {
+      if (!cleanDestId) {
+        appState.addToast("Please select an international shipping destination country.", "error");
+        return;
+      }
+      if (
+        !receiverNameInput.trim() || 
+        !receiverAddressInput.trim() || 
+        !receiverPhoneInput.trim() || 
+        !receiverCityInput.trim() || 
+        !receiverStateInput.trim() || 
+        !receiverZipInput.trim()
+      ) {
+        appState.addToast("Please fill in all international receiver address fields.", "error");
+        return;
+      }
+    }
 
     const selectedAddress = appState.customerAddresses.find(
       (a) => String(a.id) === String(appState.selectedAddressId),
     );
 
-    const cleanAddrId = hasDelivery
-      ? sanitizeUuid(appState.selectedAddressId)
-      : null;
-    const cleanCenterId = !hasDelivery ? sanitizeUuid(activeCenter?.id) : null;
-
-    // Validation guard: Rejects click if UUID values have not completed loading
-    if (hasDelivery && !cleanAddrId) {
-      appState.addToast(
-        "Please select or add a delivery address to complete your order.",
-        "error",
-      );
-      return;
-    }
-    if (!hasDelivery && !cleanCenterId) {
-      appState.addToast(
-        "Retrieving pickup center parameters. Please wait a moment...",
-        "info",
-      );
-      return;
-    }
-
-    const notesDetail = `Checked out via pay form. ${paymentType === "momo" ? "MoMo: " + phoneNumberInput : "Card"}.${!hasDelivery ? " Selected Pickup Station: " + appState.activeBranch : ""}`;
+    const notesDetail = fulfillmentMode === 'shipping'
+      ? shippingNotesInput.trim()
+      : `Checked out via pay form. ${paymentType === "momo" ? "MoMo: " + phoneNumberInput : "Card"}.${fulfillmentMode === 'pickup' ? " Selected Pickup Station: " + appState.activeBranch : ""}`;
 
     const payload = {
       delivery_address_id: cleanAddrId,
       pickup_center_id: cleanCenterId,
-      delivery_method: hasDelivery ? "DOOR_DELIVERY" : "PICKUP_STATION",
-      shipping_destination_id: null,
-      shipping_destination: "",
-      shipping_receiver_name: appState.user
-        ? `${appState.user.first_name || ""} ${appState.user.last_name || ""}`.trim()
-        : "Postal Customer",
-      shipping_receiver_address: selectedAddress
-        ? selectedAddress.street || selectedAddress.line1 || ""
-        : "",
-      shipping_receiver_phone_number:
-        phoneNumberInput || appState.user?.phone_number || "",
-      shipping_receiver_city: selectedAddress
-        ? selectedAddress.city || "Kampala"
-        : "Kampala",
-      shipping_receiver_state: selectedAddress
-        ? selectedAddress.state || selectedAddress.city || "Central"
-        : "Central",
-      shipping_receiver_zip_code: selectedAddress
-        ? selectedAddress.zip_code || "00000"
-        : "00000",
+      delivery_method: deliveryMethod,
+      shipping_destination_id: cleanDestId,
+      shipping_destination: fulfillmentMode === 'shipping' ? selectedShippingDestinationName : "",
+      shipping_receiver_name: fulfillmentMode === 'shipping' ? receiverNameInput.trim() : (appState.user ? `${appState.user.first_name || ""} ${appState.user.last_name || ""}`.trim() : "Postal Customer"),
+      shipping_receiver_address: fulfillmentMode === 'shipping' ? receiverAddressInput.trim() : (selectedAddress ? selectedAddress.street || selectedAddress.line1 || "" : ""),
+      shipping_receiver_phone_number: fulfillmentMode === 'shipping' ? receiverPhoneInput.trim() : (phoneNumberInput || appState.user?.phone_number || ""),
+      shipping_receiver_city: fulfillmentMode === 'shipping' ? receiverCityInput.trim() : (selectedAddress ? selectedAddress.city || "Kampala" : "Kampala"),
+      shipping_receiver_state: fulfillmentMode === 'shipping' ? receiverStateInput.trim() : (selectedAddress ? selectedAddress.state || selectedAddress.city || "Central" : "Central"),
+      shipping_receiver_zip_code: fulfillmentMode === 'shipping' ? receiverZipInput.trim() : (selectedAddress ? selectedAddress.zip_code || "00000" : "00000"),
       notes: notesDetail,
     };
 
@@ -9598,10 +9869,9 @@ style="transform: rotate({-design.rotate}deg)"
 
       if (orderId && matchedPayment?.id) {
         const finalAmount = Math.max(0, total);
-
         try {
           if (paymentType === "momo") {
-            let order = await appState.addOrderPayment(
+            await appState.addOrderPayment(
               orderId,
               finalAmount,
               matchedPayment.id,
@@ -9639,11 +9909,11 @@ style="transform: rotate({-design.rotate}deg)"
     }
   }
 
-  function toggleFulfillment() {
-    const targetMode = hasDelivery ? "pickup" : "delivery";
+  function setAllFulfillment(mode) {
     appState.cartItems.forEach((item) => {
-      item.fulfillment = targetMode;
+      item.fulfillment = mode;
     });
+    appState.cartItems = [...appState.cartItems];
   }
 
   // --- REAL-TIME PAYMENT VALIDATORS ---
@@ -9722,6 +9992,31 @@ style="transform: rotate({-design.rotate}deg)"
   let isMomoValid = $derived(
     /^\+?\d{9,15}$/.test(phoneNumberInput.replace(/\s/g, "")),
   );
+
+  let isPlaceOrderDisabled = $derived.by(() => {
+    if (appState.cartItems.length === 0) return true;
+
+    if (fulfillmentMode === 'delivery') {
+      if (appState.customerAddresses.length === 0 || !appState.selectedAddressId) return true;
+    }
+    if (fulfillmentMode === 'shipping') {
+      if (!selectedShippingDestinationId) return true;
+      if (
+        !receiverNameInput.trim() || 
+        !receiverAddressInput.trim() || 
+        !receiverPhoneInput.trim() || 
+        !receiverCityInput.trim() || 
+        !receiverStateInput.trim() || 
+        !receiverZipInput.trim()
+      ) return true;
+    }
+
+    if (paymentType === 'card') {
+      return !isCardFormValid;
+    } else {
+      return !isMomoValid;
+    }
+  });
 </script>
 
 <div class="space-y-8 select-none font-sans py-2">
@@ -9878,21 +10173,22 @@ style="transform: rotate({-design.rotate}deg)"
             </h3>
           </div>
 
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <button
-              onclick={toggleFulfillment}
+              type="button"
+              onclick={() => setAllFulfillment("pickup")}
               class="w-full text-left p-4 rounded-xl border-2 transition-all flex items-start gap-3 focus:outline-none
-                {!hasDelivery
+                {fulfillmentMode === 'pickup'
                 ? 'border-[#0aad0a] bg-emerald-50/10'
                 : 'border-slate-200 bg-white hover:border-slate-300'}"
             >
               <div class="pt-0.5">
                 <div
-                  class="w-4 h-4 rounded-full border flex items-center justify-center {!hasDelivery
+                  class="w-4 h-4 rounded-full border flex items-center justify-center {fulfillmentMode === 'pickup'
                     ? 'border-[#0aad0a]'
                     : 'border-slate-300'}"
                 >
-                  {#if !hasDelivery}
+                  {#if fulfillmentMode === 'pickup'}
                     <div class="w-2 h-2 rounded-full bg-[#0aad0a]"></div>
                   {/if}
                 </div>
@@ -9905,19 +10201,20 @@ style="transform: rotate({-design.rotate}deg)"
             </button>
 
             <button
-              onclick={toggleFulfillment}
+              type="button"
+              onclick={() => setAllFulfillment("delivery")}
               class="w-full text-left p-4 rounded-xl border-2 transition-all flex items-start gap-3 focus:outline-none
-                {hasDelivery
+                {fulfillmentMode === 'delivery'
                 ? 'border-[#0aad0a] bg-emerald-50/10'
                 : 'border-slate-200 bg-white hover:border-slate-300'}"
             >
               <div class="pt-0.5">
                 <div
-                  class="w-4 h-4 rounded-full border flex items-center justify-center {hasDelivery
+                  class="w-4 h-4 rounded-full border flex items-center justify-center {fulfillmentMode === 'delivery'
                     ? 'border-[#0aad0a]'
                     : 'border-slate-300'}"
                 >
-                  {#if hasDelivery}
+                  {#if fulfillmentMode === 'delivery'}
                     <div class="w-2 h-2 rounded-full bg-[#0aad0a]"></div>
                   {/if}
                 </div>
@@ -9925,6 +10222,32 @@ style="transform: rotate({-design.rotate}deg)"
               <div>
                 <span class="text-sm text-slate-900 block font-bold"
                   >Alternative Delivery</span
+                >
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onclick={() => setAllFulfillment("shipping")}
+              class="w-full text-left p-4 rounded-xl border-2 transition-all flex items-start gap-3 focus:outline-none
+                {fulfillmentMode === 'shipping'
+                ? 'border-[#0aad0a] bg-emerald-50/10'
+                : 'border-slate-200 bg-white hover:border-slate-300'}"
+            >
+              <div class="pt-0.5">
+                <div
+                  class="w-4 h-4 rounded-full border flex items-center justify-center {fulfillmentMode === 'shipping'
+                    ? 'border-[#0aad0a]'
+                    : 'border-slate-300'}"
+                >
+                  {#if fulfillmentMode === 'shipping'}
+                    <div class="w-2 h-2 rounded-full bg-[#0aad0a]"></div>
+                  {/if}
+                </div>
+              </div>
+              <div>
+                <span class="text-sm text-slate-900 block font-bold"
+                  >International Shipping</span
                 >
               </div>
             </button>
@@ -9941,12 +10264,14 @@ style="transform: rotate({-design.rotate}deg)"
             >
               Delivery Location
             </h3>
-            <button
-              onclick={() => (appState.isLocationModalOpen = true)}
-              class="text-xs font-bold text-[#0aad0a] hover:underline focus:outline-none"
-            >
-              Change
-            </button>
+            {#if fulfillmentMode !== 'shipping'}
+              <button
+                onclick={() => (appState.isLocationModalOpen = true)}
+                class="text-xs font-bold text-[#0aad0a] hover:underline focus:outline-none"
+              >
+                Change
+              </button>
+            {/if}
           </div>
 
           <div class="flex items-start gap-4">
@@ -9974,7 +10299,7 @@ style="transform: rotate({-design.rotate}deg)"
             </div>
 
             <div class="space-y-3 flex-1 min-w-0">
-              {#if hasDelivery}
+              {#if fulfillmentMode === 'delivery'}
                 {#if appState.customerAddresses.length > 0}
                   {@const currentAddr =
                     appState.customerAddresses.find(
@@ -10035,7 +10360,7 @@ style="transform: rotate({-design.rotate}deg)"
                     >Register address coordinates in settings</a
                   >
                 {/if}
-              {:else}
+              {:else if fulfillmentMode === 'pickup'}
                 <p class="text-sm font-semibold text-slate-900">
                   Post Office Smart Pickup
                 </p>
@@ -10058,6 +10383,111 @@ style="transform: rotate({-design.rotate}deg)"
                       <option value={station.value}>{station.label}</option>
                     {/each}
                   </select>
+                </div>
+              {:else if fulfillmentMode === 'shipping'}
+                <div class="space-y-4 w-full">
+                  <!-- International Destination Country Selector -->
+                  <div class="space-y-1.5">
+                    <label for="shipping-dest-select" class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest">Destination Country</label>
+                    <select
+                      id="shipping-dest-select"
+                      bind:value={selectedShippingDestinationId}
+                      class="w-full text-xs font-semibold text-slate-700 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 focus:border-[#003d29] focus:outline-none cursor-pointer transition-colors"
+                    >
+                      <option value="" disabled>Select destination country...</option>
+                      {#each appState.shippingCountries as country (country.id)}
+                        <option value={country.id}>{country.label}</option>
+                      {/each}
+                    </select>
+                  </div>
+
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <!-- Receiver Name -->
+                    <div class="border border-slate-200 rounded-[14px] px-4 pt-2.5 pb-3 flex flex-col bg-white">
+                      <label for="recv-name" class="text-[11px] text-neutral-500 font-normal mb-0.5">Receiver Name</label>
+                      <input
+                        id="recv-name"
+                        type="text"
+                        bind:value={receiverNameInput}
+                        placeholder="John Doe"
+                        class="outline-none text-[15px] text-[#333] bg-transparent w-full p-0 border-0 focus:ring-0 leading-normal"
+                      />
+                    </div>
+
+                    <!-- Receiver Phone -->
+                    <div class="border border-slate-200 rounded-[14px] px-4 pt-2.5 pb-3 flex flex-col bg-white">
+                      <label for="recv-phone" class="text-[11px] text-neutral-500 font-normal mb-0.5">Receiver Phone</label>
+                      <input
+                        id="recv-phone"
+                        type="text"
+                        bind:value={receiverPhoneInput}
+                        placeholder="+1 555-0199"
+                        class="outline-none text-[15px] text-[#333] bg-transparent w-full p-0 border-0 focus:ring-0 leading-normal"
+                      />
+                    </div>
+                  </div>
+
+                  <!-- Receiver Address -->
+                  <div class="border border-slate-200 rounded-[14px] px-4 pt-2.5 pb-3 flex flex-col bg-white">
+                    <label for="recv-addr" class="text-[11px] text-neutral-500 font-normal mb-0.5">Street Address</label>
+                    <input
+                      id="recv-addr"
+                      type="text"
+                      bind:value={receiverAddressInput}
+                      placeholder="123 Main St, Apt 4B"
+                      class="outline-none text-[15px] text-[#333] bg-transparent w-full p-0 border-0 focus:ring-0 leading-normal"
+                    />
+                  </div>
+
+                  <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <!-- City -->
+                    <div class="border border-slate-200 rounded-[14px] px-4 pt-2.5 pb-3 flex flex-col bg-white">
+                      <label for="recv-city" class="text-[11px] text-neutral-500 font-normal mb-0.5">City</label>
+                      <input
+                        id="recv-city"
+                        type="text"
+                        bind:value={receiverCityInput}
+                        placeholder="New York"
+                        class="outline-none text-[15px] text-[#333] bg-transparent w-full p-0 border-0 focus:ring-0 leading-normal"
+                      />
+                    </div>
+
+                    <!-- State / Region -->
+                    <div class="border border-slate-200 rounded-[14px] px-4 pt-2.5 pb-3 flex flex-col bg-white">
+                      <label for="recv-state" class="text-[11px] text-neutral-500 font-normal mb-0.5">State / Region</label>
+                      <input
+                        id="recv-state"
+                        type="text"
+                        bind:value={receiverStateInput}
+                        placeholder="NY"
+                        class="outline-none text-[15px] text-[#333] bg-transparent w-full p-0 border-0 focus:ring-0 leading-normal"
+                      />
+                    </div>
+
+                    <!-- Zip Code -->
+                    <div class="border border-slate-200 rounded-[14px] px-4 pt-2.5 pb-3 flex flex-col bg-white">
+                      <label for="recv-zip" class="text-[11px] text-neutral-500 font-normal mb-0.5">Zip / Postal Code</label>
+                      <input
+                        id="recv-zip"
+                        type="text"
+                        bind:value={receiverZipInput}
+                        placeholder="10001"
+                        class="outline-none text-[15px] text-[#333] bg-transparent w-full p-0 border-0 focus:ring-0 leading-normal"
+                      />
+                    </div>
+                  </div>
+
+                  <!-- Shipping Notes -->
+                  <div class="border border-slate-200 rounded-[14px] px-4 pt-2.5 pb-3 flex flex-col bg-white">
+                    <label for="recv-notes" class="text-[11px] text-neutral-500 font-normal mb-0.5">Shipping Notes</label>
+                    <textarea
+                      id="recv-notes"
+                      bind:value={shippingNotesInput}
+                      placeholder="Special instructions for customs or international delivery..."
+                      rows="2"
+                      class="outline-none text-[13px] text-[#333] bg-transparent w-full p-0 border-0 focus:ring-0 leading-normal resize-none"
+                    ></textarea>
+                  </div>
                 </div>
               {/if}
             </div>
@@ -10308,9 +10738,7 @@ style="transform: rotate({-design.rotate}deg)"
 
           <button
             onclick={processOrder}
-            disabled={(hasDelivery &&
-              appState.customerAddresses.length === 0) ||
-              (paymentType === "card" ? !isCardFormValid : !isMomoValid)}
+            disabled={isPlaceOrderDisabled}
             class="w-full bg-[#0aad0a] hover:bg-[#099409] disabled:bg-slate-200 disabled:text-slate-400 text-white font-extrabold text-xs h-11 rounded-full flex items-center justify-center transition-all shadow-md focus:outline-none cursor-pointer"
           >
             Place Order
@@ -10922,8 +11350,147 @@ style="transform: rotate({-design.rotate}deg)"
 </style>
 </file>
 
+<file path="routes/refund-and-return-policy/+page.svelte">
+<!-- routes/refund-and-return-policy/+page.svelte -->
+<script>
+  import { goto } from "$app/navigation";
+</script>
+
+<svelte:head>
+  <title>Refund and Return Policy - Postcom</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="true" />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;700;800&display=swap" rel="stylesheet" />
+</svelte:head>
+
+<div 
+  class="max-w-3xl mx-auto py-10 px-4 sm:px-6 select-none text-slate-800"
+  style="font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;"
+>
+  <!-- Navigation Header -->
+  <nav class="flex items-center justify-between gap-y-2.5 text-xs font-semibold text-slate-400 border-b border-slate-100 pb-4 mb-8">
+    <div class="flex items-center gap-2">
+      <a href="/" class="hover:text-slate-900 transition-colors">Catalog</a>
+      <svg class="w-3 h-3 text-slate-300" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+      </svg>
+      <span class="text-slate-800 font-semibold">Refund & Return Policy</span>
+    </div>
+    
+    <button 
+      onclick={() => goto("/")}
+      class="flex items-center gap-1.5 text-red-600 hover:text-red-700 transition-colors focus:outline-none cursor-pointer"
+    >
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
+      </svg>
+      <span class="font-semibold text-xs">Back to Home</span>
+    </button>
+  </nav>
+
+  <!-- Content Card -->
+  <div class="bg-white border border-slate-100 rounded-3xl p-6 sm:p-8 space-y-6 shadow-xs leading-relaxed">
+    <div class="space-y-1">
+      <span class="text-[10px] font-black uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded">
+        SLA Protected
+      </span>
+      <h1 class="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight pt-2">Refund & Return Policy</h1>
+      <p class="text-xs text-slate-400 font-medium">Last updated: February 2026</p>
+    </div>
+
+    <!-- Section 1 -->
+    <div class="space-y-2.5">
+      <h3 class="text-sm font-black text-slate-900 uppercase tracking-wider">1. Purpose & Scope</h3>
+      <p class="text-[13px] text-slate-600 font-light">
+        This policy establishes a structured and compliant framework for handling product returns, refunds, cancellations, and dispute resolution within the Postcom platform. It complies with applicable laws of the Republic of Uganda including the Consumer Protection Act, Electronic Transactions Act, and Data Protection and Privacy Act (2019). This policy applies to all registered clients and onboarded marketplace vendors.
+      </p>
+    </div>
+
+    <!-- Section 2 -->
+    <div class="space-y-2.5 border-t border-slate-100 pt-4">
+      <h3 class="text-sm font-black text-slate-900 uppercase tracking-wider">2. Return Eligibility Criteria</h3>
+      <p class="text-[13px] text-slate-600 font-light">
+        Clients must initiate a return request within <strong>48 hours to 7 days</strong> of delivery, depending on the product category. Items are eligible for return under the following approved conditions:
+      </p>
+      <ul class="list-disc pl-5 text-[13px] text-slate-600 font-light space-y-1">
+        <li>The item arrived damaged at delivery (supported by photo/video evidence).</li>
+        <li>Incorrect specifications, model, size, or incorrect product delivered.</li>
+        <li>Defective product discovered within the return eligibility window.</li>
+        <li>Incomplete orders or missing items.</li>
+        <li>Change-of-mind (only if the Vendor listing expressly permits and the item is completely unused, sealed, and in its original intact packaging).</li>
+      </ul>
+    </div>
+
+    <!-- Section 3 -->
+    <div class="space-y-2.5 border-t border-slate-100 pt-4">
+      <h3 class="text-sm font-black text-slate-900 uppercase tracking-wider">3. Non-Returnable Items</h3>
+      <p class="text-[13px] text-slate-600 font-light">
+        The following categories are strictly excluded from returns and refunds due to safety and health regulations:
+      </p>
+      <ul class="list-disc pl-5 text-[13px] text-slate-600 font-light space-y-1">
+        <li>Perishable agricultural produce and fresh goods.</li>
+        <li>Opened personal care, cosmetics, or wellness products.</li>
+        <li>Custom-made, tailored, or personalized items.</li>
+        <li>Digital vouchers, tokens, and virtual goods.</li>
+        <li>Items clearly marked as <strong>Final Sale</strong> at the time of purchase.</li>
+      </ul>
+    </div>
+
+    <!-- Section 4 -->
+    <div class="space-y-2.5 border-t border-slate-100 pt-4">
+      <h3 class="text-sm font-black text-slate-900 uppercase tracking-wider">4. Return & Refund Service Level Agreements (SLAs)</h3>
+      <p class="text-[13px] text-slate-600 font-light">
+        To protect shoppers and maintain trust, all parties must adhere to the following strict timelines:
+      </p>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs bg-slate-50 p-4 rounded-2xl border border-slate-200/50">
+        <div>
+          <p class="text-[10px] font-black text-slate-400 uppercase">Client Initiation Window</p>
+          <p class="font-bold text-slate-900">48 Hours to 7 Days</p>
+        </div>
+        <div>
+          <p class="text-[10px] font-black text-slate-400 uppercase">Vendor Acknowledgment SLA</p>
+          <p class="font-bold text-slate-900">24 Hours</p>
+        </div>
+        <div>
+          <p class="text-[10px] font-black text-slate-400 uppercase">Vendor Decision (Approve/Reject)</p>
+          <p class="font-bold text-slate-900">72 Hours</p>
+        </div>
+        <div>
+          <p class="text-[10px] font-black text-slate-400 uppercase">Refund Processing SLA</p>
+          <p class="font-bold text-slate-900">3 Days (Wallet) / 7 Days (Card/Bank)</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 5 -->
+    <div class="space-y-2.5 border-t border-slate-100 pt-4">
+      <h3 class="text-sm font-black text-slate-900 uppercase tracking-wider">5. Financial Fee Structures & Logistics</h3>
+      <ul class="list-disc pl-5 text-[13px] text-slate-600 font-light space-y-1.5">
+        <li><strong>Vendor Fault:</strong> If a return is due to vendor fault (damaged, incorrect, or defective), the Vendor bears the full logistical postage cost.</li>
+        <li><strong>Client Choice:</strong> If a return is initiated due to a change-of-mind, the Client bears the return logistics and postal dispatch fee.</li>
+        <li><strong>SLA Breach Penalties:</strong> Failure by a Vendor to process return approvals within SLA timelines may attract a penalty of 5% of the order value per delayed day (capped at 20%).</li>
+        <li><strong>Fraud Mitigation:</strong> Repeated SLA breaches by a Vendor can result in temporary store suspension. Conversely, fraudulent return claims by Clients may result in account termination and forfeiture of refund rights.</li>
+      </ul>
+    </div>
+
+    <!-- Contact Support Footer -->
+    <div class="border-t border-slate-100 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div>
+        <h4 class="text-xs font-bold text-slate-900 uppercase">Need to initiate a return?</h4>
+        <p class="text-[11px] text-slate-400 font-medium">Reach out to our centralized ePosta GPO desk for tracking support.</p>
+      </div>
+      <a 
+        href="/account/help" 
+        class="bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-bold h-9 px-4 rounded-full flex items-center justify-center transition-colors cursor-pointer"
+      >
+        Contact Help Center
+      </a>
+    </div>
+  </div>
+</div>
+</file>
+
 <file path="routes/+layout.svelte">
-<!-- routes/+layout.svelte -->
 <script>
   import "./layout.css";
   import { page } from "$app/state";
@@ -10935,79 +11502,39 @@ style="transform: rotate({-design.rotate}deg)"
   import { onMount } from "svelte";
   import AccountSidebarNav from "$lib/components/sidebars/AccountSidebarNav.svelte";
   import Locationselection from "$lib/components/modals/locationselection.svelte";
+  import {
+    mapBackendProductToUI,
+    resolveImageUrl,
+  } from "$lib/utils/mappers.js";
 
+  let isSearchFocused = $state(false);
+  let debounceTimer;
   let { children } = $props();
 
-  // Search input & suggestion states
-  let locationSearchQuery = $state("");
-  let isLocating = $state(false);
-  let placeSuggestions = $state([]); // Google Maps places predictions array
-  let resolvedUserAddress = $state(""); // Reverse geocoded location address
-  let tempSelectedAddress = $state(""); // Tracks active address before confirming save
+  let searchQuery = $state("");
 
-  // NEW: Address book fields state
-  let saveToAddressBook = $state(false);
-  let aptInput = $state("");
-  let businessInput = $state("");
-  let commentsInput = $state("");
-  let isSavingAddress = $state(false);
+  let googleMapsKey = $state("");
 
-  const GOOGLE_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "";
-
-  // NEW: Detail fields state & maps coordinate markers
-
-  let selectedLat = $state(0.3476); // Default Kampala coordinates
-  let selectedLng = $state(32.5825);
-
-  // Request browser GPS position [6]
-  function requestCustomerLocationOnOpen() {
-    if (!navigator.geolocation) {
-      appState.addToast(
-        "Geolocation is not supported by your browser.",
-        "error",
-      );
-      return;
-    }
-
-    isLocating = true;
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const { latitude, longitude } = position.coords;
-        selectedLat = latitude;
-        selectedLng = longitude;
-        await reverseGeocodeAddress(latitude, longitude);
-        isLocating = false;
-      },
-      () => {
-        isLocating = false;
-        appState.addToast(
-          "Permission denied or location lookup failed.",
-          "error",
-        );
-      },
-      { enableHighAccuracy: true, timeout: 5000 },
-    );
-  }
-
-  // Resolve typed/searched suggestions to exact coordinates using Geocoder [3]
- 
-  onMount(() => {
+  onMount(async () => {
     appState.initAuth();
-    loadGoogleMapsScript();
+    try {
+      const res = await fetch("/api/maps/key");
+      const data = await res.json();
+      googleMapsKey = data.key;
+      loadGoogleMapsScript();
+    } catch (err) {
+      console.warn("Could not load Maps config.", err);
+    }
   });
 
-  // Dynamically load Google Maps Places Library [3]
   function loadGoogleMapsScript() {
-    if (typeof window === "undefined" || window.google) return;
+    if (typeof window === "undefined" || window.google || !googleMapsKey) return;
     const script = document.createElement("script");
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_API_KEY}&libraries=places`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${googleMapsKey}&libraries=places`;
     script.async = true;
     script.defer = true;
     document.head.appendChild(script);
   }
-
-  // Google Maps autocomplete suggestions lookup
-  
 
   let isAccountProfile = $derived(
     page.url.pathname.startsWith("/account") && appState.isLoggedIn,
@@ -11019,6 +11546,31 @@ style="transform: rotate({-design.rotate}deg)"
     }
     return "flex-1 min-w-0 p-4 sm:p-6 bg-white rounded-tl-3xl border-t border-l border-slate-100/5 2xl:px-20";
   });
+
+  // Track the local typed searchQuery to fetch live autocomplete suggestions (200ms debounce)
+  $effect(() => {
+    const q = searchQuery;
+    clearTimeout(debounceTimer);
+    if (!q.trim()) {
+      appState.searchSuggestions = [];
+      return;
+    }
+    debounceTimer = setTimeout(() => {
+      appState.fetchSearchSuggestions(q);
+    }, 200);
+    return () => clearTimeout(debounceTimer);
+  });
+
+  function handleSuggestionClick(suggestion) {
+    if (suggestion.raw) {
+      const mapped = mapBackendProductToUI(suggestion.raw);
+      if (mapped) {
+        appState.selectedProductForModal = mapped;
+      }
+    }
+    searchQuery = suggestion.label;
+    isSearchFocused = false;
+  }
 
   $effect(() => {
     if (typeof window !== "undefined") {
@@ -11036,10 +11588,12 @@ style="transform: rotate({-design.rotate}deg)"
     appState.fulfillmentMode = mode;
   }
 
-  // Handle product searches via header form
+  // Handle product searches via form submission
   function handleSearchSubmit(e) {
     e.preventDefault();
+    appState.searchQuery = searchQuery;
     appState.fetchProducts();
+    isSearchFocused = false;
     goto("/products");
   }
 
@@ -11052,13 +11606,16 @@ style="transform: rotate({-design.rotate}deg)"
   function handleClaimCoupon(coupon) {
     appState.addToast(`Coupon "${coupon}" successfully applied!`);
   }
-  const ACCENT = '#0aad0a';
+  const ACCENT = "#0aad0a";
 </script>
 
 <ProductDetailModal />
 <CartDrawer />
 
-<div class="min-h-screen bg-white text-gray-800 flex flex-col" style="font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;">
+<div
+  class="min-h-screen bg-white text-gray-800 flex flex-col"
+  style="font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;"
+>
   <header
     class="bg-white border-b border-gray-200 px-4 sm:px-6 py-3.5 flex items-center justify-between gap-4 select-none sticky top-0 z-50"
   >
@@ -11086,9 +11643,12 @@ style="transform: rotate({-design.rotate}deg)"
           />
         </svg>
       </button>
- 
+
       <a
         href="/"
+        onclick={() => {
+          appState.searchQuery = "";
+        }}
         class="flex items-center gap-1.5 group focus:outline-none text-left"
       >
         <img
@@ -11100,7 +11660,7 @@ style="transform: rotate({-design.rotate}deg)"
           postcom
         </span>
       </a>
- 
+
       <button
         onclick={() => (appState.isLocationModalOpen = true)}
         class="hidden sm:flex items-center gap-1.5 bg-gray-100 border border-transparent hover:border-gray-300 px-3.5 py-1.5 rounded-full text-[12.5px] font-bold text-gray-700 transition-all focus:outline-none cursor-pointer"
@@ -11112,10 +11672,13 @@ style="transform: rotate({-design.rotate}deg)"
         <span class="text-gray-400 text-[10px]">▼</span>
       </button>
     </div>
- 
-    <form onsubmit={handleSearchSubmit} class="flex-1 max-w-lg hidden md:block">
+
+    <form
+      onsubmit={handleSearchSubmit}
+      class="flex-1 max-w-lg hidden md:block relative"
+    >
       <div
-        class="flex items-center bg-gray-100 border border-transparent rounded-full px-4 py-2.5 transition-all focus-within:bg-white focus-within:border-[#0aad0a] focus-within:shadow-[0_0_0_3px_rgba(10,173,10,0.08)]"
+        class="flex items-center bg-gray-100 border border-transparent rounded-full pl-4 pr-1.5 py-1.5 transition-all focus-within:bg-white focus-within:border-[#0aad0a] focus-within:shadow-[0_0_0_3px_rgba(10,173,10,0.08)]"
       >
         <svg
           class="w-4 h-4 text-gray-400 mr-2.5 shrink-0"
@@ -11133,12 +11696,50 @@ style="transform: rotate({-design.rotate}deg)"
         <input
           type="search"
           placeholder="Search products, coffee, Kanga..."
-          bind:value={appState.searchQuery}
-          class="w-full bg-transparent border-0 focus:outline-none text-[13.5px] font-medium focus:ring-0 text-gray-800 placeholder-gray-500"
+          bind:value={searchQuery}
+          onfocus={() => (isSearchFocused = true)}
+          onblur={() => setTimeout(() => (isSearchFocused = false), 200)}
+          class="w-full bg-transparent border-0 focus:outline-none text-[13.5px] font-medium focus:ring-0 text-gray-800 placeholder-gray-500 py-1"
         />
+        <button
+          type="submit"
+          class="bg-[#0aad0a] hover:bg-[#099409] text-white text-xs font-bold px-4 py-2 rounded-full shrink-0 transition-colors focus:outline-none cursor-pointer"
+        >
+          Search
+        </button>
       </div>
+
+      <!-- Autocomplete Dropdown (Limit: 5) -->
+      {#if isSearchFocused && appState.searchSuggestions.length > 0}
+        <div
+          class="absolute left-0 right-0 top-full mt-2 bg-white border border-gray-200 rounded-2xl shadow-lg z-50 overflow-hidden py-1.5 animate-in fade-in slide-in-from-top-2 duration-150"
+        >
+          {#each appState.searchSuggestions as suggestion (suggestion.id)}
+            <button
+              type="button"
+              onclick={() => handleSuggestionClick(suggestion)}
+              class="w-full text-left px-4 py-2.5 hover:bg-gray-50 flex items-center gap-3 transition-colors focus:outline-none"
+            >
+              <div
+                class="w-8 h-8 rounded-lg border border-gray-100 overflow-hidden shrink-0 flex items-center justify-center bg-gray-50"
+              >
+                <img
+                  src={resolveImageUrl(suggestion.image) ||
+                    "https://images.unsplash.com/photo-1500937386664-56d1dfef3854?w=100"}
+                  alt=""
+                  class="max-w-full max-h-full object-cover mix-blend-multiply"
+                />
+              </div>
+              <span
+                class="text-[13px] font-semibold text-gray-800 line-clamp-1 truncate"
+                >{suggestion.label}</span
+              >
+            </button>
+          {/each}
+        </div>
+      {/if}
     </form>
- 
+
     <div class="flex items-center gap-2.5 shrink-0">
       {#if appState.isLoggedIn}
         <button
@@ -11166,18 +11767,18 @@ style="transform: rotate({-design.rotate}deg)"
         >
           Log in
         </button>
- 
+
         <button
           onclick={() => goto("/account")}
           class="hidden md:inline-flex items-center justify-center text-white text-[12.5px] font-bold h-9 px-4 rounded-full transition-colors focus:outline-none cursor-pointer"
           style="background: {ACCENT};"
-          onmouseover={(e) => e.currentTarget.style.background = '#099409'}
-          onmouseout={(e) => e.currentTarget.style.background = ACCENT}
+          onmouseover={(e) => (e.currentTarget.style.background = "#099409")}
+          onmouseout={(e) => (e.currentTarget.style.background = ACCENT)}
         >
           Sign up
         </button>
       {/if}
- 
+
       <button
         onclick={() => (appState.isCartOpen = true)}
         class="bg-gray-900 hover:bg-black text-white font-bold text-[12.5px] px-4 py-2.5 rounded-full flex items-center gap-2 transition-all active:scale-95 focus:outline-none"
@@ -11205,7 +11806,7 @@ style="transform: rotate({-design.rotate}deg)"
       </button>
     </div>
   </header>
- 
+
   <div class="flex-1 flex min-h-screen">
     {#if !isAccountProfile}
       <SidebarNav
@@ -11216,12 +11817,12 @@ style="transform: rotate({-design.rotate}deg)"
         onClaimCoupon={handleClaimCoupon}
       />
     {/if}
- 
+
     <main class={mainClass}>
       {@render children?.()}
     </main>
   </div>
- 
+
   {#if appState.isSidebarOpen}
     <button
       onclick={() => (appState.isSidebarOpen = false)}
@@ -11235,44 +11836,44 @@ style="transform: rotate({-design.rotate}deg)"
   class="fixed bottom-6 right-6 z-50 flex flex-col gap-2 w-full max-w-xs sm:max-w-sm pointer-events-none px-4 sm:px-0"
   aria-live="polite"
 >
- {#each appState.toasts as toast (toast.id)}
-  <div
-    class="pointer-events-auto bg-white  text-white border-4 border-slate-800 rounded-2xl px-4 py-3.5 shadow-lg flex items-center justify-between gap-3 text-[12.5px] font-bold animate-in slide-in-from-bottom-3 duration-200"
-    style="font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;"
-  >
-    <div class="flex items-center gap-2.5 min-w-0">
-      <span
-        class="w-1.5 h-1.5 rounded-full shrink-0 animate-pulse"
-        style="background: {toast.type === 'error'
-          ? '#f43f5e'
-          : toast.type === 'success'
-          ? '#0aad0a'
-          : '#9ca3af'};"
-      ></span>
-      <span class="truncate text-slate-900">{toast.message}</span>
-    </div>
-    <button
-      onclick={() =>
-        (appState.toasts = appState.toasts.filter((t) => t.id !== toast.id))}
-      class="text-gray-400 hover:text-white transition-colors focus:outline-none shrink-0"
-      aria-label="Dismiss"
+  {#each appState.toasts as toast (toast.id)}
+    <div
+      class="pointer-events-auto bg-white text-white border-4 border-slate-800 rounded-2xl px-4 py-3.5 shadow-lg flex items-center justify-between gap-3 text-[12.5px] font-bold animate-in slide-in-from-bottom-3 duration-200"
+      style="font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;"
     >
-      <svg
-        class="w-3.5 h-3.5"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2.5"
-        viewBox="0 0 24 24"
+      <div class="flex items-center gap-2.5 min-w-0">
+        <span
+          class="w-1.5 h-1.5 rounded-full shrink-0 animate-pulse"
+          style="background: {toast.type === 'error'
+            ? '#f43f5e'
+            : toast.type === 'success'
+              ? '#0aad0a'
+              : '#9ca3af'};"
+        ></span>
+        <span class="truncate text-slate-900">{toast.message}</span>
+      </div>
+      <button
+        onclick={() =>
+          (appState.toasts = appState.toasts.filter((t) => t.id !== toast.id))}
+        class="text-gray-400 hover:text-white transition-colors focus:outline-none shrink-0"
+        aria-label="Dismiss"
       >
-        <path
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          d="M6 18L18 6M6 6l12 12"
-        />
-      </svg>
-    </button>
-  </div>
-{/each}
+        <svg
+          class="w-3.5 h-3.5"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.5"
+          viewBox="0 0 24 24"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            d="M6 18L18 6M6 6l12 12"
+          />
+        </svg>
+      </button>
+    </div>
+  {/each}
 </div>
 
 <!-- Inside routes/+layout.svelte inside the location modal structure -->
@@ -11305,13 +11906,22 @@ style="transform: rotate({-design.rotate}deg)"
   import CategoryShowcase from "$lib/components/cards&grids/CategoryShowcase.svelte";
   import SubcategoryScroller from "$lib/components/cards&grids/SubcategoryScroller.svelte";
   import ProductCard from "$lib/components/cards&grids/ProductCard.svelte";
+  import { untrack } from "svelte";
 
+  $effect(() => {
+    // Untrack to prevent search query keystrokes from triggering home-page API fetches
+    untrack(() => {
+      appState.fetchProducts();
+    });
+    appState.fetchBanners();
+    appState.fetchWishlist();
+  });
   // Dynamic derivation: maps flat IDs array to reactive bool index map [5]
   let favoritedMap = $derived(
     appState.favorites.reduce((acc, id) => {
       acc[id] = true;
       return acc;
-    }, {})
+    }, {}),
   );
 
   let agroProducts = $derived(
@@ -11339,12 +11949,6 @@ style="transform: rotate({-design.rotate}deg)"
     }),
   );
 
-  $effect(() => {
-    appState.fetchProducts();
-    appState.fetchBanners();
-    appState.fetchWishlist(); // Sync wishlist on entry [5]
-  });
-
   function handleProductRedirect(product) {
     appState.selectedProductForModal = product;
   }
@@ -11359,16 +11963,20 @@ style="transform: rotate({-design.rotate}deg)"
 </script>
 
 <div class="flex flex-col gap-10 pb-16 select-none font-sans">
-  
   <div class="space-y-6">
     <SubcategoryScroller />
-    
+
     <!-- Sponsored Banner -->
     <div class="flex flex-col">
-      <span class="text-xs text-slate-400 font-light pb-1.5 select-none">Sponsored</span>
-      <div class="overflow-hidden rounded-2xl border border-slate-100 hover:shadow-xs transition-shadow duration-300">
+      <span class="text-xs text-slate-400 font-light pb-1.5 select-none"
+        >Sponsored</span
+      >
+      <div
+        class="overflow-hidden rounded-2xl border border-slate-100 hover:shadow-xs transition-shadow duration-300"
+      >
         <img
-          src={appState.banners[0]?.image ||
+          src={
+          // appState.banners[0]?.image ||
             "https://www.sliderrevolution.com/wp-content/uploads/2023/06/fashion-shop-header-slider-for-wordpress.gif"}
           onerror={(e) => {
             e.currentTarget.src =
@@ -11382,7 +11990,9 @@ style="transform: rotate({-design.rotate}deg)"
 
     <!-- AISLE 1: FARM FRESH PRODUCE -->
     <div class="space-y-4 pt-4">
-      <div class="flex justify-between items-baseline border-b border-slate-100 pb-3">
+      <div
+        class="flex justify-between items-baseline border-b border-slate-100 pb-3"
+      >
         <div>
           <h3 class="text-lg font-bold text-slate-900 tracking-tight">
             Farm fresh produce
@@ -11402,7 +12012,9 @@ style="transform: rotate({-design.rotate}deg)"
         </button>
       </div>
 
-      <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 sm:gap-4 2xl:grid-cols-6 xl:grid-cols-5 gap-3">
+      <div
+        class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 sm:gap-4 2xl:grid-cols-6 xl:grid-cols-5 gap-3"
+      >
         {#each agroProducts as product (product.id)}
           <div class="w-full">
             <ProductCard
@@ -11423,7 +12035,9 @@ style="transform: rotate({-design.rotate}deg)"
   <!-- AISLE 2: STAPLES & SPECIALTY -->
   {#if foodBeverages.length > 0}
     <div class="space-y-4 pt-2">
-      <div class="flex justify-between items-baseline border-b border-slate-100 pb-3">
+      <div
+        class="flex justify-between items-baseline border-b border-slate-100 pb-3"
+      >
         <div>
           <h3 class="text-lg font-bold text-slate-900 tracking-tight">
             Food & staples
@@ -11444,7 +12058,9 @@ style="transform: rotate({-design.rotate}deg)"
       </div>
 
       <!-- Horizontal scroll layout -->
-      <div class="flex gap-4 overflow-x-auto pb-4 scrollbar-none snap-x -mx-4 px-4 sm:mx-0 sm:px-0">
+      <div
+        class="flex gap-4 overflow-x-auto pb-4 scrollbar-none snap-x -mx-4 px-4 sm:mx-0 sm:px-0"
+      >
         {#each foodBeverages as product (product.id)}
           <div class="w-[170px] sm:w-[180px] shrink-0 snap-start">
             <ProductCard
@@ -11463,7 +12079,9 @@ style="transform: rotate({-design.rotate}deg)"
   <!-- AISLE 3: ARTISAN & CULTURAL CRAFTS -->
   {#if artsCrafts.length > 0}
     <div class="space-y-4 pt-2">
-      <div class="flex justify-between items-baseline border-b border-slate-100 pb-3">
+      <div
+        class="flex justify-between items-baseline border-b border-slate-100 pb-3"
+      >
         <div>
           <h3 class="text-lg font-bold text-slate-900 tracking-tight">
             Artisan & cultural crafts
@@ -11484,22 +12102,63 @@ style="transform: rotate({-design.rotate}deg)"
       </div>
 
       <!-- Horizontal Scroll Container -->
-      <div class="flex gap-4 overflow-x-auto pb-4 scrollbar-none snap-x -mx-4 px-4 sm:mx-0 sm:px-0">
-        
+      <div
+        class="flex gap-4 overflow-x-auto pb-4 scrollbar-none snap-x -mx-4 px-4 sm:mx-0 sm:px-0"
+      >
+        <!-- Sponsored Banner
+    <div class="flex flex-col">
+      <span class="text-xs text-slate-400 font-light pb-1.5 select-none">Sponsored</span>
+      <div class="overflow-hidden rounded-2xl border border-slate-100 hover:shadow-xs transition-shadow duration-300">
+        {#if appState.banners[0]}
+          {#if appState.banners[0].url}
+            <a href={appState.banners[0].url} class="block w-full h-full">
+              <img
+                src={appState.banners[0].image}
+                alt={appState.banners[0].caption || "Promo Banner"}
+                style="object-position: {appState.banners[0].bgPosition};"
+                class="text-3xl text-white h-48 md:h-96 w-full object-cover flex md:justify-start justify-center"
+              />
+            </a>
+          {:else}
+            <img
+              src={appState.banners[0].image}
+              alt={appState.banners[0].caption || "Promo Banner"}
+              style="object-position: {appState.banners[0].bgPosition};"
+              class="text-3xl text-white h-48 md:h-96 w-full object-cover flex md:justify-start justify-center"
+            />
+          {/if}
+        {:else}
+          <img
+            src="https://www.sliderrevolution.com/wp-content/uploads/2023/06/fashion-shop-header-slider-for-wordpress.gif"
+            alt="Promo Banner"
+            class="text-3xl text-white h-48 md:h-96 w-full object-cover flex md:justify-start justify-center"
+          />
+        {/if}
+      </div>
+    </div> -->
+      
         <!-- 1. Sponsored Ad (First in Scroll) -->
-        <div class="w-[240px] sm:w-[280px] shrink-0 snap-start flex flex-col gap-1.5">
+        <div
+          class="w-[240px] sm:w-[280px] shrink-0 snap-start flex flex-col gap-1.5"
+        >
           <div class="text-xs text-slate-400 font-light pl-1 select-none">
             Sponsored
           </div>
-          <div class="relative h-64 sm:h-[280px] w-full group overflow-hidden rounded-2xl border border-slate-100 hover:shadow-xs transition-shadow duration-300 bg-slate-50">
+          <div
+            class="relative h-64 sm:h-[280px] w-full group overflow-hidden rounded-2xl border border-slate-100 hover:shadow-xs transition-shadow duration-300 bg-slate-50"
+          >
             <img
               class="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
               src="https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExYTBnMDdscTA5ZzR5cnluZTR6NDhqcXxlNTV6aDFkanR0cmt5Z3BjOSZlcD12MV9naWZzX3JlbGF0ZWQmY3Q9Zw/XHX8QKQ5vXQnRZ32VI/giphy.gif"
               alt="Artisan Craft Ad"
             />
-            
-            <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/60 to-transparent">
-              <span class="text-white text-sm font-semibold">Heritage Collections</span>
+
+            <div
+              class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/60 to-transparent"
+            >
+              <span class="text-white text-sm font-semibold"
+                >Heritage Collections</span
+              >
             </div>
           </div>
         </div>
@@ -11567,6 +12226,21 @@ style="transform: rotate({-design.rotate}deg)"
 		<div style="display: contents">%sveltekit.body%</div>
 	</body>
 </html>
+</file>
+
+<file path="hooks.server.js">
+export function handle({ event, resolve }) {
+  const response = resolve(event);
+
+  return response.then(res => {
+    res.headers.set('X-Content-Type-Options', 'nosniff');
+    res.headers.set('X-Frame-Options', 'DENY');
+    res.headers.set('X-XSS-Protection', '1; mode=block');
+    res.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.headers.set('Permissions-Policy', 'geolocation=(self), camera=(), microphone=()');
+    return res;
+  });
+}
 </file>
 
 </files>

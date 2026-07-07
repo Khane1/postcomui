@@ -1,5 +1,4 @@
 // lib/state.svelte.js
-import { products as defaultProducts } from './data/products.js';
 import { publicApi, authApi } from './config/api.js';
 import { mapBackendProductToUI, mapBackendBrandToUI,resolveImageUrl } from './utils/mappers.js';
 import { goto } from '$app/navigation';
@@ -211,7 +210,6 @@ class AppState {
     } else {
       this.favorites = [...(this.favorites || []), productId];
       const matchedProduct = this.allProducts.find(p => p.id === productId) || 
-                            defaultProducts.find(p => p.id === productId) || 
                             { id: productId, name: "Loading...", price: 0, images: [] };
       this.wishlistProducts = [...(this.wishlistProducts || []), matchedProduct];
       this.addToast("Saved item to Favorites");
@@ -240,8 +238,27 @@ class AppState {
       }
     }
   }
+// POST /api/v1/cart/items - Sequentially uploads locally staged guest items to the database
+  async mergeLocalCartToServer() {
+    const token = this.accessToken;
+    if (!token || this.cartItems.length === 0) return;
 
-  // FIXED: Writes output tokens to storage matching credentials schema
+    console.log("[Cart Sync] Merging guest cart items into the server-side database...");
+    for (const item of this.cartItems) {
+      if (item.product && item.product.id) {
+        try {
+          await authApi.post('cart/items', {
+            product_id: item.product.id,
+            quantity: item.quantity
+          });
+        } catch (err) {
+          console.warn(`[Cart Sync] Failed to merge guest item ${item.product.id} to server:`, err);
+        }
+      }
+    }
+  }
+
+  // FIXED: Synchronizes profile datasets and pushes local guest items to server
   async login(email, password) {
     try {
       const response = await publicApi.post('auth/login', { email, password });
@@ -256,8 +273,12 @@ class AppState {
       await this.fetchProfile();
       await this.fetchCustomerAddresses();
       await this.fetchWishlist();
-      await this.fetchOrders(); // NEW: Pull order history
+      await this.fetchOrders(); 
+
+      // Synchronize and merge local guest items to server database
+      await this.mergeLocalCartToServer();
       await this.syncCartItems();
+
       this.addToast("Signed in successfully!");
       return { success: true };
     } catch (err) {
@@ -647,67 +668,42 @@ class AppState {
 
   async fetchProducts() {
     if (this._productsInFlight) return;
+    this._productsInFlight = true;
+    this.isLoading = true;
 
-    if (this.searchQuery) {
-      this._productsInFlight = true;
-      this.isLoading = true;
-      try {
-        const response = await publicApi.get('search/products', {
-          params: { q: this.searchQuery, per_page: 100, is_published: true }
-        });
-        const data = response.data !== undefined ? response.data : response;
-        let rawList = [];
-        if (data) {
-          if (Array.isArray(data)) rawList = data;
-          else if (data.hits && Array.isArray(data.hits)) rawList = data.hits;
-          else if (data.content && Array.isArray(data.content)) rawList = data.content;
-          else if (data.data && Array.isArray(data.data)) rawList = data.data;
-        }
-        this.allProducts = rawList.map(mapBackendProductToUI).filter(Boolean);
-      } catch (err) {
-        console.warn("[Products State] Search API failed.", err);
-        this.allProducts = [];
-      } finally {
-        this.isLoading = false;
-        this._productsInFlight = false;
+    try {
+      const params = this.searchQuery
+        ? { q: this.searchQuery, per_page: 100, is_published: true }
+        : { page: 1, perPage: 100, is_published: true,
+            category_id: this.selectedCategory !== 'All' ? this.selectedCategory : undefined };
+
+      const endpoint = this.searchQuery ? 'search/products' : 'products';
+      const response = await publicApi.get(endpoint, { params, timeout: 15000 });
+      const data = response.data !== undefined ? response.data : response;
+
+      let rawList = [];
+      if (data) {
+        if (Array.isArray(data)) rawList = data;
+        else if (data.hits && Array.isArray(data.hits)) rawList = data.hits;
+        else if (data.content && Array.isArray(data.content)) rawList = data.content;
+        else if (data.products && Array.isArray(data.products)) rawList = data.products;
+        else if (data.data && Array.isArray(data.data)) rawList = data.data;
+        else if (data.items && Array.isArray(data.items)) rawList = data.items;
       }
-      return;
-    }
 
-    // Non-search: show local data instantly
-    if (this.allProducts.length === 0) {
-      this.allProducts = defaultProducts;
-    }
-
-    if (this.isLoggedIn) {
-      this._productsInFlight = true;
-      publicApi.get('products', {
-        params: {
-          page: 1, perPage: 100, is_published: true,
-          category_id: this.selectedCategory !== 'All' ? this.selectedCategory : undefined
-        },
-        timeout: 15000
-      }).then(response => {
-        const data = response.data !== undefined ? response.data : response;
-        let rawList = [];
-        if (data) {
-          if (Array.isArray(data)) rawList = data;
-          else if (data.hits && Array.isArray(data.hits)) rawList = data.hits;
-          else if (data.content && Array.isArray(data.content)) rawList = data.content;
-          else if (data.products && Array.isArray(data.products)) rawList = data.products;
-          else if (data.data && Array.isArray(data.data)) rawList = data.data;
-          else if (data.items && Array.isArray(data.items)) rawList = data.items;
-        }
-        const mapped = rawList.map(mapBackendProductToUI).filter(Boolean);
-        if (mapped.length > 0) {
-          const seen = new Set();
-          this.allProducts = mapped.filter(p => {
-            if (seen.has(p.id)) return false;
-            seen.add(p.id);
-            return true;
-          });
-        }
-      }).catch(() => {}).finally(() => { this._productsInFlight = false; });
+      const mapped = rawList.map(mapBackendProductToUI).filter(Boolean);
+      const seen = new Set();
+      this.allProducts = mapped.filter(p => {
+        if (!p.id || seen.has(p.id)) return false;
+        seen.add(p.id);
+        return true;
+      });
+    } catch (err) {
+      console.warn("[Products State] API failed.", err);
+      this.allProducts = [];
+    } finally {
+      this.isLoading = false;
+      this._productsInFlight = false;
     }
   }
 
@@ -1071,27 +1067,50 @@ class AppState {
     }, 3000);
   }
 
-  // GET /api/v1/orders/customer - Synchronizes customer order histories [5]
- // Getter groups and maps the raw backend flat format to standard UI models
-  get mappedOrders() {
+  // GET /api/v1/orders/customer - Synchronizes customer order histories
+  // Getter groups and maps the raw backend format defensively to standard UI models
+  // GET /api/v1/orders/customer - Synchronizes customer order histories
+  // Getter groups and maps the raw backend objects according to structural interfaces
+   get mappedOrders() {
     return (this.orders || []).map(order => {
       if (!order) return null;
 
-      // Map order items, cleanly parsing string quantities, prices, and totals
-      const orderItems = (order.order_items || []).map(item => {
+      // Defensive item-level array normalization
+      const rawItems = order.order_items || order.items || order.lines || [];
+      const orderItems = rawItems.map(item => {
+        const qty = Number(item.quantity || item.qty || 1);
+        const priceVal = Number(item.price || item.unit_price || 0);
+        
+        // Dynamic subtotal calculation fallback
+        const calculatedSubtotal = qty * priceVal;
+        const totalVal = (item.total !== undefined && item.total !== null && Number(item.total) > 0)
+          ? Number(item.total)
+          : calculatedSubtotal;
+
         return {
           id: item.id,
+          order_id: item.order_id || "",
           product_id: item.product_id || "",
+          vendor_id: item.vendor_id || "",
           product_name: item.product_name || "Sourced Item",
           product_image: item.product_image || "",
-          quantity: Number(item.quantity || 1),
-          price: String(item.price || 0),
-          total: String(item.total || (Number(item.price || 0) * Number(item.quantity || 1))),
-          description: item.description || ""
+          quantity: qty,
+          price: priceVal,
+          tax_rate: Number(item.tax_rate || 0),
+          tax_amount: Number(item.tax_amount || 0),
+          total: totalVal,
+          is_confirmed: !!item.is_confirmed,
+          vendor: item.vendor || null
         };
       });
 
-      // Cross-reference payment list by matching reference, order ID, or notes
+      // Dynamic order-level grand total aggregation
+      const calculatedGrandTotal = orderItems.reduce((acc, i) => acc + i.total, 0);
+      const finalTotalAmount = (order.total_amount !== undefined && order.total_amount !== null && Number(order.total_amount) > 0)
+        ? Number(order.total_amount)
+        : calculatedGrandTotal;
+
+      // Safe cross-referencing
       const matchedPayment = (this.payments || []).find(p => 
         (p.reference && p.reference === order.reference) || 
         (p.notes && p.notes.includes(order.reference)) ||
@@ -1099,22 +1118,27 @@ class AppState {
       );
 
       return {
-        id: order.id,
+        id: order.id || order.order_id,
         customer_id: order.customer_id || "",
-        date: order.date || order.order_date || order.created_at || "",
-        due_date: order.due_date || "",
-        reference: order.reference || "ORDER",
-        total_amount: String(order.total_amount || orderItems.reduce((acc, i) => acc + Number(i.total), 0)),
-        remaining_balance: order.remaining_balance || "0",
-        status: order.status || "PENDING",
-        notes: order.notes || "",
-        billing_address: order.billing_address || null,
-        shipping_address: order.shipping_address || null,
+        customer: order.customer || null,
         delivery_method: order.delivery_method || "PICKUP_STATION",
+        reference: order.reference || "ORDER",
         delivery_fees: Number(order.delivery_fees || 0),
-        order_items: orderItems,
-        created_at: order.created_at || order.date || "",
+        total_amount: finalTotalAmount,
+        due_amount: Number(order.due_amount !== undefined ? order.due_amount : (order.due_amount ?? finalTotalAmount)),
+        status: order.status || "PENDING",
+        statusUI: this.resolveOrderStatusUI(order.status || "PENDING"),
+        date: order.date || order.created_at || "",
+        created_at: order.created_at || "",
         updated_at: order.updated_at || "",
+        order_items: orderItems,
+        shipping_destination: order.shipping_destination || "",
+        shipping_receiver_name: order.shipping_receiver_name || "",
+        shipping_receiver_address: order.shipping_receiver_address || "",
+        shipping_receiver_phone_number: order.shipping_receiver_phone_number || "",
+        shipping_receiver_city: order.shipping_receiver_city || "",
+        shipping_receiver_state: order.shipping_receiver_state || "",
+        shipping_receiver_zip_code: order.shipping_receiver_zip_code || "",
         
         // Resolved payment details
         payment_status: matchedPayment ? matchedPayment.status : (order.status === "CONFIRMED" ? "SUCCESSFUL" : "PENDING"),
@@ -1123,26 +1147,105 @@ class AppState {
     }).filter(Boolean);
   }
  // lib/state.svelte.js
+ async getOrderDetails(orderId) {
+    try {
+      const res = await authApi.get(`orders/${orderId}`);
+      return res.data !== undefined ? res.data : res;
+    } catch (err) {
+      console.warn(`[Orders API] Failed to retrieve detailed order for ID: ${orderId}`, err);
+      return null;
+    }
+  }
 
-  async fetchOrders() {
+
+
+  resolveOrderStatusUI(statusVal) {
+    const s = (statusVal || "PENDING").toLowerCase();
+    const label = statusVal
+      ? statusVal.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+      : "Pending";
+
+    if (
+      s.includes("fulfilled") ||
+      s.includes("confirmed") ||
+      s.includes("successful") ||
+      s.includes("received")
+    ) {
+      return {
+        type: "confirmed",
+        label,
+        dotClass: "bg-[#0B8A00]",
+        textClass: "text-[#0B8A00]",
+        bgClass: "bg-[#EAF7E9]",
+      };
+    }
+    if (s.includes("cancel") || s.includes("fail") || s.includes("reject")) {
+      return {
+        type: "cancelled",
+        label,
+        dotClass: "bg-rose-600",
+        textClass: "text-rose-700",
+        bgClass: "bg-rose-50",
+      };
+    }
+    return {
+      type: "inprogress",
+      label,
+      dotClass: "bg-amber-500",
+      textClass: "text-amber-700",
+      bgClass: "bg-amber-50",
+    };
+  }
+   async fetchOrders() {
     if (!this.isLoggedIn) return;
     this.isLoading = true;
     try {
-      const response = await authApi.get('orders/customer', {
-        params: { page: 1, per_page: 100 }
-      });
+      let response;
+      try {
+        response = await authApi.get('orders/customer', {
+          params: { page: 1, per_page: 100 }
+        });
+      } catch (err) {
+        console.warn("[Orders Sync] orders/customer endpoint unavailable, falling back to standard list path...", err);
+        response = await authApi.get('orders', {
+          params: { page: 1, per_page: 100 }
+        });
+      }
+
       const data = response.data !== undefined ? response.data : response;
 
       let flatList = [];
       if (data) {
-        if (Array.isArray(data)) flatList = data;
-        else if (data.content && Array.isArray(data.content)) flatList = data.content;
-        else if (data.data && Array.isArray(data.data)) flatList = data.data;
+        if (Array.isArray(data)) {
+          flatList = data;
+        } else if (data.content && Array.isArray(data.content)) {
+          flatList = data.content;
+        } else if (data.data && Array.isArray(data.data)) {
+          flatList = data.data;
+        } else if (data.orders && Array.isArray(data.orders)) {
+          flatList = data.orders;
+        }
       }
+      flatList = flatList.filter(Boolean);
 
-      this.orders = flatList.filter(Boolean);
+      // Extract unique order IDs and resolve detailed records in parallel
+      const detailPromises = flatList.map(async (basicOrder) => {
+        const orderId = basicOrder.id || basicOrder.order_id;
+        if (!orderId) return basicOrder;
+
+        try {
+          const detailRes = await authApi.get(`orders/${orderId}`);
+          const detailData = detailRes.data !== undefined ? detailRes.data : detailRes;
+          return { ...basicOrder, ...detailData };
+        } catch (detailErr) {
+          console.error(`[Orders Detail Fetch Failed] Fallback applied for ID ${orderId}:`, detailErr);
+          return basicOrder; // Safe error-recovery fallback to basic flat object
+        }
+      });
+
+      this.orders = await Promise.all(detailPromises);
     } catch (err) {
-      console.warn("Could not retrieve customer orders.", err);
+      console.error("Could not retrieve customer orders from any endpoint path.", err);
       this.orders = [];
     } finally {
       this.isLoading = false;

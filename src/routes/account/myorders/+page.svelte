@@ -22,8 +22,32 @@
   // Loading status spinner state inside the modal
   let isFetchingTracking = $state(false);
 
-  function toggleExpand(orderId) {
-    expandedOrderId = expandedOrderId === orderId ? null : orderId;
+   async function toggleExpand(orderId, reference) {
+    const key = orderId || reference;
+    if (expandedOrderId === key) {
+      expandedOrderId = null;
+    } else {
+      expandedOrderId = key;
+      
+      const matched = appState.mappedOrders.find(o => o.id === orderId || o.reference === reference);
+      
+      // If line items or totals aren't populated, fetch using the reference
+      if (matched && (!matched.order_items || matched.order_items.length === 0)) {
+        try {
+          const identifier = matched.reference || matched.id;
+          const detail = await appState.getOrderDetails(identifier);
+          if (detail) {
+            const index = appState.orders.findIndex(o => o.id === matched.id || o.reference === matched.reference);
+            if (index !== -1) {
+              // Reactively merge the standard details into the orders state
+              appState.orders[index] = { ...appState.orders[index], ...detail };
+            }
+          }
+        } catch (err) {
+          console.warn("[Order Details Fetch] Failed to load on-demand details:", err);
+        }
+      }
+    }
   }
 
   // Fetches tracking logs from /api/v1/orders/track using order reference
@@ -209,15 +233,16 @@
       </div>
 
       <div class="divide-y divide-gray-100">
-        {#each appState.mappedOrders as order, index (order?.id || order?.reference || index)}
+        <!-- FIXED: Appended index to guarantee uniqueness even with duplicate backend IDs -->
+        {#each appState.mappedOrders as order, index (order?.reference ? `${order.reference}-${index}` : (order?.reference ? `${order.reference}-${index}` : index))}
           {@const statusConf = status(order?.status)}
-          {@const isExpanded = expandedOrderId === (order.id ?? index)}
+          {@const isExpanded = expandedOrderId === (order.reference ?? index)}
           {@const itemCount = order?.order_items?.length || 0}
 
           <div>
             <!-- Row summary: click to expand -->
             <button
-              onclick={() => toggleExpand(order.id ?? index)}
+              onclick={() => toggleExpand(order.reference || index)}
               class="w-full text-left grid grid-cols-1 sm:grid-cols-[1fr_130px_140px_120px_150px] gap-2 sm:gap-4 sm:items-center px-6 py-4 hover:bg-gray-50/60 transition-colors focus:outline-none cursor-pointer {isExpanded
                 ? 'bg-gray-50/60'
                 : ''}"
@@ -309,7 +334,8 @@
                   <div class="bg-white border border-gray-100 rounded-2xl p-4">
                     <p class="text-[12.5px] font-bold text-gray-500 mb-2">Items</p>
                     <div class="flex flex-col divide-y divide-gray-100">
-                      {#each order?.order_items || [] as item, itemIndex (item?.id || item?.product_id || itemIndex)}
+                      <!-- FIXED: Safe item uniqueness mapping -->
+                      {#each order?.order_items || [] as item, itemIndex (item?.id ? `${item.id}-${itemIndex}` : itemIndex)}
                         {@const price = Number(item.price || 0)}
                         <div class="py-3 flex items-center justify-between gap-4 first:pt-0 last:pb-0">
                           <div class="flex items-center gap-3 min-w-0">
@@ -508,7 +534,8 @@
         {:else}
           <!-- Vertical Timeline -->
           <div class="relative border-l border-gray-200 ml-3 pl-6 space-y-5 max-h-48 overflow-y-auto pr-1">
-            {#each trackingLogs as log, index (log.id || index)}
+            <!-- FIXED: Safe timeline unique mapping -->
+            {#each trackingLogs as log, index (log.id ? `${log.id}-${index}` : index)}
               {@const isFirst = index === 0}
               <div class="relative">
                 <!-- Timeline circle marker -->

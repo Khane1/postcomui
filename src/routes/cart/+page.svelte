@@ -42,7 +42,7 @@
   );
 
   let fulfillmentMode = $derived(
-    appState.cartItems[0]?.fulfillment || "pickup"
+    appState.cartItems[0]?.fulfillment || "pickup",
   );
 
   let total = $derived(subtotal + shippingFee);
@@ -79,14 +79,17 @@
 
   // Watcher effect for auto-filling destination label
   $effect(() => {
-    const selected = appState.shippingCountries.find(d => d.id === selectedShippingDestinationId);
-    selectedShippingDestinationName = selected?.label || '';
+    const selected = appState.shippingCountries.find(
+      (d) => d.id === selectedShippingDestinationId,
+    );
+    selectedShippingDestinationName = selected?.label || "";
   });
 
   $effect(() => {
     if (appState.user) {
       if (!receiverNameInput) {
-        receiverNameInput = `${appState.user.first_name || ""} ${appState.user.last_name || ""}`.trim();
+        receiverNameInput =
+          `${appState.user.first_name || ""} ${appState.user.last_name || ""}`.trim();
       }
       if (!receiverPhoneInput) {
         receiverPhoneInput = appState.user.phone_number || "";
@@ -119,7 +122,7 @@
       const packageWeightKg = Math.max(0.5, totalGrams / 1000);
 
       // Handle International Shipping Option
-      if (fulfillmentMode === 'shipping') {
+      if (fulfillmentMode === "shipping") {
         if (!selectedShippingDestinationId) {
           shippingFee = 0;
           return;
@@ -127,7 +130,7 @@
         const payload = {
           delivery_method: "SHIPPING",
           package_weight: packageWeightKg,
-          shipping_destination_id: selectedShippingDestinationId
+          shipping_destination_id: selectedShippingDestinationId,
         };
         const fee = await appState.getDeliveryFee(payload);
         shippingFee = fee;
@@ -141,24 +144,25 @@
           String(c.id) === String(appState.activeBranch),
       );
 
-      const cleanAddrId = fulfillmentMode === 'delivery'
-        ? sanitizeUuid(appState.selectedAddressId)
-        : null;
-      const cleanCenterId = fulfillmentMode === 'pickup'
-        ? sanitizeUuid(activeCenter?.id)
-        : null;
+      const cleanAddrId =
+        fulfillmentMode === "delivery"
+          ? sanitizeUuid(appState.selectedAddressId)
+          : null;
+      const cleanCenterId =
+        fulfillmentMode === "pickup" ? sanitizeUuid(activeCenter?.id) : null;
 
-      if (fulfillmentMode === 'delivery' && !cleanAddrId) {
+      if (fulfillmentMode === "delivery" && !cleanAddrId) {
         shippingFee = 5500; // Static fallback
         return;
       }
-      if (fulfillmentMode === 'pickup' && !cleanCenterId) {
+      if (fulfillmentMode === "pickup" && !cleanCenterId) {
         shippingFee = 0; // Free pickup fallback
         return;
       }
 
       const payload = {
-        delivery_method: fulfillmentMode === 'delivery' ? "DOOR_DELIVERY" : "PICKUP_STATION",
+        delivery_method:
+          fulfillmentMode === "delivery" ? "DOOR_DELIVERY" : "PICKUP_STATION",
         package_weight: packageWeightKg,
         delivery_address_id: cleanAddrId,
         pickup_center_id: cleanCenterId,
@@ -255,43 +259,57 @@
     let cleanDestId = null;
     let deliveryMethod = "PICKUP_STATION";
 
-    if (fulfillmentMode === 'delivery') {
+    if (fulfillmentMode === "delivery") {
       cleanAddrId = sanitizeUuid(appState.selectedAddressId);
       deliveryMethod = "DOOR_DELIVERY";
-    } else if (fulfillmentMode === 'pickup') {
+    } else if (fulfillmentMode === "pickup") {
       const activeCenter = appState.allPickUpCenters.find(
-        (c) => c.name === appState.activeBranch || String(c.id) === String(appState.activeBranch),
+        (c) =>
+          c.name === appState.activeBranch ||
+          String(c.id) === String(appState.activeBranch),
       );
       cleanCenterId = sanitizeUuid(activeCenter?.id);
       deliveryMethod = "PICKUP_STATION";
-    } else if (fulfillmentMode === 'shipping') {
+    } else if (fulfillmentMode === "shipping") {
       cleanDestId = selectedShippingDestinationId;
       deliveryMethod = "SHIPPING";
     }
 
     // Validation checks for each mode
-    if (fulfillmentMode === 'delivery' && !cleanAddrId) {
-      appState.addToast("Please select or add a delivery address to complete your order.", "error");
+    if (fulfillmentMode === "delivery" && !cleanAddrId) {
+      appState.addToast(
+        "Please select or add a delivery address to complete your order.",
+        "error",
+      );
       return;
     }
-    if (fulfillmentMode === 'pickup' && !cleanCenterId) {
-      appState.addToast("Retrieving pickup center parameters. Please wait...", "info");
+    if (fulfillmentMode === "pickup" && !cleanCenterId) {
+      appState.addToast(
+        "Retrieving pickup center parameters. Please wait...",
+        "info",
+      );
       return;
     }
-    if (fulfillmentMode === 'shipping') {
+    if (fulfillmentMode === "shipping") {
       if (!cleanDestId) {
-        appState.addToast("Please select an international shipping destination country.", "error");
+        appState.addToast(
+          "Please select an international shipping destination country.",
+          "error",
+        );
         return;
       }
       if (
-        !receiverNameInput.trim() || 
-        !receiverAddressInput.trim() || 
-        !receiverPhoneInput.trim() || 
-        !receiverCityInput.trim() || 
-        !receiverStateInput.trim() || 
+        !receiverNameInput.trim() ||
+        !receiverAddressInput.trim() ||
+        !receiverPhoneInput.trim() ||
+        !receiverCityInput.trim() ||
+        !receiverStateInput.trim() ||
         !receiverZipInput.trim()
       ) {
-        appState.addToast("Please fill in all international receiver address fields.", "error");
+        appState.addToast(
+          "Please fill in all international receiver address fields.",
+          "error",
+        );
         return;
       }
     }
@@ -300,22 +318,52 @@
       (a) => String(a.id) === String(appState.selectedAddressId),
     );
 
-    const notesDetail = fulfillmentMode === 'shipping'
-      ? shippingNotesInput.trim()
-      : `Checked out via pay form. ${paymentType === "momo" ? "MoMo: " + phoneNumberInput : "Card"}.${fulfillmentMode === 'pickup' ? " Selected Pickup Station: " + appState.activeBranch : ""}`;
+    const notesDetail =
+      fulfillmentMode === "shipping"
+        ? shippingNotesInput.trim()
+        : `Checked out via pay form. ${paymentType === "momo" ? "MoMo: " + phoneNumberInput : "Card"}.${fulfillmentMode === "pickup" ? " Selected Pickup Station: " + appState.activeBranch : ""}`;
 
     const payload = {
       delivery_address_id: cleanAddrId,
       pickup_center_id: cleanCenterId,
       delivery_method: deliveryMethod,
       shipping_destination_id: cleanDestId,
-      shipping_destination: fulfillmentMode === 'shipping' ? selectedShippingDestinationName : "",
-      shipping_receiver_name: fulfillmentMode === 'shipping' ? receiverNameInput.trim() : (appState.user ? `${appState.user.first_name || ""} ${appState.user.last_name || ""}`.trim() : "Postal Customer"),
-      shipping_receiver_address: fulfillmentMode === 'shipping' ? receiverAddressInput.trim() : (selectedAddress ? selectedAddress.street || selectedAddress.line1 || "" : ""),
-      shipping_receiver_phone_number: fulfillmentMode === 'shipping' ? receiverPhoneInput.trim() : (phoneNumberInput || appState.user?.phone_number || ""),
-      shipping_receiver_city: fulfillmentMode === 'shipping' ? receiverCityInput.trim() : (selectedAddress ? selectedAddress.city || "Kampala" : "Kampala"),
-      shipping_receiver_state: fulfillmentMode === 'shipping' ? receiverStateInput.trim() : (selectedAddress ? selectedAddress.state || selectedAddress.city || "Central" : "Central"),
-      shipping_receiver_zip_code: fulfillmentMode === 'shipping' ? receiverZipInput.trim() : (selectedAddress ? selectedAddress.zip_code || "00000" : "00000"),
+      shipping_destination:
+        fulfillmentMode === "shipping" ? selectedShippingDestinationName : "",
+      shipping_receiver_name:
+        fulfillmentMode === "shipping"
+          ? receiverNameInput.trim()
+          : appState.user
+            ? `${appState.user.first_name || ""} ${appState.user.last_name || ""}`.trim()
+            : "Postal Customer",
+      shipping_receiver_address:
+        fulfillmentMode === "shipping"
+          ? receiverAddressInput.trim()
+          : selectedAddress
+            ? selectedAddress.street || selectedAddress.line1 || ""
+            : "",
+      shipping_receiver_phone_number:
+        fulfillmentMode === "shipping"
+          ? receiverPhoneInput.trim()
+          : phoneNumberInput || appState.user?.phone_number || "",
+      shipping_receiver_city:
+        fulfillmentMode === "shipping"
+          ? receiverCityInput.trim()
+          : selectedAddress
+            ? selectedAddress.city || "Kampala"
+            : "Kampala",
+      shipping_receiver_state:
+        fulfillmentMode === "shipping"
+          ? receiverStateInput.trim()
+          : selectedAddress
+            ? selectedAddress.state || selectedAddress.city || "Central"
+            : "Central",
+      shipping_receiver_zip_code:
+        fulfillmentMode === "shipping"
+          ? receiverZipInput.trim()
+          : selectedAddress
+            ? selectedAddress.zip_code || "00000"
+            : "00000",
       notes: notesDetail,
     };
 
@@ -363,10 +411,11 @@
     } catch (err) {
       console.error("[Cart Checkout Failure] Processing error:", err);
       isCheckingStatus = false;
-      const serverMessage = err.response?.data?.message || 
-                            err.response?.data?.error || 
-                            err.message || 
-                            "Checkout request could not be completed.";
+      const serverMessage =
+        err.response?.data?.message ||
+        err.response?.data?.error ||
+        err.message ||
+        "Checkout request could not be completed.";
       appState.addToast(serverMessage, "error");
     }
   }
@@ -458,22 +507,27 @@
   let isPlaceOrderDisabled = $derived.by(() => {
     if (appState.cartItems.length === 0) return true;
 
-    if (fulfillmentMode === 'delivery') {
-      if (appState.customerAddresses.length === 0 || !appState.selectedAddressId) return true;
+    if (fulfillmentMode === "delivery") {
+      if (
+        appState.customerAddresses.length === 0 ||
+        !appState.selectedAddressId
+      )
+        return true;
     }
-    if (fulfillmentMode === 'shipping') {
+    if (fulfillmentMode === "shipping") {
       if (!selectedShippingDestinationId) return true;
       if (
-        !receiverNameInput.trim() || 
-        !receiverAddressInput.trim() || 
-        !receiverPhoneInput.trim() || 
-        !receiverCityInput.trim() || 
-        !receiverStateInput.trim() || 
+        !receiverNameInput.trim() ||
+        !receiverAddressInput.trim() ||
+        !receiverPhoneInput.trim() ||
+        !receiverCityInput.trim() ||
+        !receiverStateInput.trim() ||
         !receiverZipInput.trim()
-      ) return true;
+      )
+        return true;
     }
 
-    if (paymentType === 'card') {
+    if (paymentType === "card") {
       return !isCardFormValid;
     } else {
       return !isMomoValid;
@@ -646,11 +700,12 @@
             >
               <div class="pt-0.5">
                 <div
-                  class="w-4 h-4 rounded-full border flex items-center justify-center {fulfillmentMode === 'pickup'
+                  class="w-4 h-4 rounded-full border flex items-center justify-center {fulfillmentMode ===
+                  'pickup'
                     ? 'border-[#0aad0a]'
                     : 'border-slate-300'}"
                 >
-                  {#if fulfillmentMode === 'pickup'}
+                  {#if fulfillmentMode === "pickup"}
                     <div class="w-2 h-2 rounded-full bg-[#0aad0a]"></div>
                   {/if}
                 </div>
@@ -672,11 +727,12 @@
             >
               <div class="pt-0.5">
                 <div
-                  class="w-4 h-4 rounded-full border flex items-center justify-center {fulfillmentMode === 'delivery'
+                  class="w-4 h-4 rounded-full border flex items-center justify-center {fulfillmentMode ===
+                  'delivery'
                     ? 'border-[#0aad0a]'
                     : 'border-slate-300'}"
                 >
-                  {#if fulfillmentMode === 'delivery'}
+                  {#if fulfillmentMode === "delivery"}
                     <div class="w-2 h-2 rounded-full bg-[#0aad0a]"></div>
                   {/if}
                 </div>
@@ -698,11 +754,12 @@
             >
               <div class="pt-0.5">
                 <div
-                  class="w-4 h-4 rounded-full border flex items-center justify-center {fulfillmentMode === 'shipping'
+                  class="w-4 h-4 rounded-full border flex items-center justify-center {fulfillmentMode ===
+                  'shipping'
                     ? 'border-[#0aad0a]'
                     : 'border-slate-300'}"
                 >
-                  {#if fulfillmentMode === 'shipping'}
+                  {#if fulfillmentMode === "shipping"}
                     <div class="w-2 h-2 rounded-full bg-[#0aad0a]"></div>
                   {/if}
                 </div>
@@ -726,7 +783,7 @@
             >
               Delivery Location
             </h3>
-            {#if fulfillmentMode !== 'shipping'}
+            {#if fulfillmentMode !== "shipping"}
               <button
                 onclick={() => (appState.isLocationModalOpen = true)}
                 class="text-xs font-bold text-[#0aad0a] hover:underline focus:outline-none"
@@ -761,7 +818,7 @@
             </div>
 
             <div class="space-y-3 flex-1 min-w-0">
-              {#if fulfillmentMode === 'delivery'}
+              {#if fulfillmentMode === "delivery"}
                 {#if appState.customerAddresses.length > 0}
                   {@const currentAddr =
                     appState.customerAddresses.find(
@@ -799,7 +856,7 @@
                       <select
                         id="address-selector"
                         bind:value={appState.selectedAddressId}
-                        class="w-full text-xs font-semibold text-slate-700 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 focus:border-[#003d29] focus:outline-none cursor-pointer transition-colors"
+                        class="w-full text-base font-semibold text-slate-700 border-2 border-[#0aad0a] rounded-xl px-3 py-2.5 focus:border-[#003d29] focus:outline-none cursor-pointer transition-colors"
                       >
                         {#each appState.customerAddresses as addr (addr.id)}
                           <option value={addr.id}>
@@ -822,7 +879,7 @@
                     >Register address coordinates in settings</a
                   >
                 {/if}
-              {:else if fulfillmentMode === 'pickup'}
+              {:else if fulfillmentMode === "pickup"}
                 <p class="text-sm font-semibold text-slate-900">
                   Post Office Smart Pickup
                 </p>
@@ -839,24 +896,30 @@
                   <select
                     id="station-selector"
                     bind:value={appState.activeBranch}
-                    class="w-full text-xs font-semibold text-slate-700 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 focus:border-[#003d29] focus:outline-none cursor-pointer transition-colors"
+                    class="w-full text-base font-semibold text-slate-700 border-2 border-[#0aad0a] rounded-xl px-3 py-2.5 focus:border-[#003d29] focus:outline-none cursor-pointer transition-colors"
                   >
                     {#each stations as station}
                       <option value={station.value}>{station.label}</option>
                     {/each}
                   </select>
                 </div>
-              {:else if fulfillmentMode === 'shipping'}
+              {:else if fulfillmentMode === "shipping"}
                 <div class="space-y-4 w-full">
                   <!-- International Destination Country Selector -->
                   <div class="space-y-1.5">
-                    <label for="shipping-dest-select" class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest">Destination Country</label>
+                    <label
+                      for="shipping-dest-select"
+                      class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest"
+                      >Destination Country</label
+                    >
                     <select
                       id="shipping-dest-select"
                       bind:value={selectedShippingDestinationId}
-                      class="w-full text-xs font-semibold text-slate-700 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 focus:border-[#003d29] focus:outline-none cursor-pointer transition-colors"
+                      class="w-full text-base font-semibold text-slate-700 bg-slate-50 border-2 border-[#0aad0a] rounded-xl px-3 py-2.5 focus:border-[#003d29] focus:outline-none cursor-pointer transition-colors"
                     >
-                      <option value="" disabled>Select destination country...</option>
+                      <option value="" disabled
+                        >Select destination country...</option
+                      >
                       {#each appState.shippingCountries as country (country.id)}
                         <option value={country.id}>{country.label}</option>
                       {/each}
@@ -865,8 +928,14 @@
 
                   <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <!-- Receiver Name -->
-                    <div class="border border-slate-200 rounded-[14px] px-4 pt-2.5 pb-3 flex flex-col bg-white">
-                      <label for="recv-name" class="text-[11px] text-neutral-500 font-normal mb-0.5">Receiver Name</label>
+                    <div
+                      class="border border-slate-200 rounded-[14px] px-4 pt-2.5 pb-3 flex flex-col bg-white"
+                    >
+                      <label
+                        for="recv-name"
+                        class="text-[11px] text-neutral-500 font-normal mb-0.5"
+                        >Receiver Name</label
+                      >
                       <input
                         id="recv-name"
                         type="text"
@@ -877,8 +946,14 @@
                     </div>
 
                     <!-- Receiver Phone -->
-                    <div class="border border-slate-200 rounded-[14px] px-4 pt-2.5 pb-3 flex flex-col bg-white">
-                      <label for="recv-phone" class="text-[11px] text-neutral-500 font-normal mb-0.5">Receiver Phone</label>
+                    <div
+                      class="border border-slate-200 rounded-[14px] px-4 pt-2.5 pb-3 flex flex-col bg-white"
+                    >
+                      <label
+                        for="recv-phone"
+                        class="text-[11px] text-neutral-500 font-normal mb-0.5"
+                        >Receiver Phone</label
+                      >
                       <input
                         id="recv-phone"
                         type="text"
@@ -890,8 +965,14 @@
                   </div>
 
                   <!-- Receiver Address -->
-                  <div class="border border-slate-200 rounded-[14px] px-4 pt-2.5 pb-3 flex flex-col bg-white">
-                    <label for="recv-addr" class="text-[11px] text-neutral-500 font-normal mb-0.5">Street Address</label>
+                  <div
+                    class="border border-slate-200 rounded-[14px] px-4 pt-2.5 pb-3 flex flex-col bg-white"
+                  >
+                    <label
+                      for="recv-addr"
+                      class="text-[11px] text-neutral-500 font-normal mb-0.5"
+                      >Street Address</label
+                    >
                     <input
                       id="recv-addr"
                       type="text"
@@ -903,8 +984,14 @@
 
                   <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <!-- City -->
-                    <div class="border border-slate-200 rounded-[14px] px-4 pt-2.5 pb-3 flex flex-col bg-white">
-                      <label for="recv-city" class="text-[11px] text-neutral-500 font-normal mb-0.5">City</label>
+                    <div
+                      class="border border-slate-200 rounded-[14px] px-4 pt-2.5 pb-3 flex flex-col bg-white"
+                    >
+                      <label
+                        for="recv-city"
+                        class="text-[11px] text-neutral-500 font-normal mb-0.5"
+                        >City</label
+                      >
                       <input
                         id="recv-city"
                         type="text"
@@ -915,8 +1002,14 @@
                     </div>
 
                     <!-- State / Region -->
-                    <div class="border border-slate-200 rounded-[14px] px-4 pt-2.5 pb-3 flex flex-col bg-white">
-                      <label for="recv-state" class="text-[11px] text-neutral-500 font-normal mb-0.5">State / Region</label>
+                    <div
+                      class="border border-slate-200 rounded-[14px] px-4 pt-2.5 pb-3 flex flex-col bg-white"
+                    >
+                      <label
+                        for="recv-state"
+                        class="text-[11px] text-neutral-500 font-normal mb-0.5"
+                        >State / Region</label
+                      >
                       <input
                         id="recv-state"
                         type="text"
@@ -927,8 +1020,14 @@
                     </div>
 
                     <!-- Zip Code -->
-                    <div class="border border-slate-200 rounded-[14px] px-4 pt-2.5 pb-3 flex flex-col bg-white">
-                      <label for="recv-zip" class="text-[11px] text-neutral-500 font-normal mb-0.5">Zip / Postal Code</label>
+                    <div
+                      class="border border-slate-200 rounded-[14px] px-4 pt-2.5 pb-3 flex flex-col bg-white"
+                    >
+                      <label
+                        for="recv-zip"
+                        class="text-[11px] text-neutral-500 font-normal mb-0.5"
+                        >Zip / Postal Code</label
+                      >
                       <input
                         id="recv-zip"
                         type="text"
@@ -940,8 +1039,14 @@
                   </div>
 
                   <!-- Shipping Notes -->
-                  <div class="border border-slate-200 rounded-[14px] px-4 pt-2.5 pb-3 flex flex-col bg-white">
-                    <label for="recv-notes" class="text-[11px] text-neutral-500 font-normal mb-0.5">Shipping Notes</label>
+                  <div
+                    class="border border-slate-200 rounded-[14px] px-4 pt-2.5 pb-3 flex flex-col bg-white"
+                  >
+                    <label
+                      for="recv-notes"
+                      class="text-[11px] text-neutral-500 font-normal mb-0.5"
+                      >Shipping Notes</label
+                    >
                     <textarea
                       id="recv-notes"
                       bind:value={shippingNotesInput}
@@ -1000,16 +1105,19 @@
                   type="button"
                   onclick={() => (paymentProvider = "mtn")}
                   class="p-3.5 rounded-xl border-2 transition-all flex items-center justify-between focus:outline-none text-left cursor-pointer
-                    {paymentProvider === 'mtn'
-                    ? 'border-[#0aad0a] bg-emerald-50/10'
-                    : 'border-slate-200 bg-white hover:border-slate-300'}"
+          {paymentProvider === 'mtn'
+                    ? 'border-[#0aad0a]'
+                    : 'border-gray-200 bg-white hover:border-gray-300'}"
+                  style={paymentProvider === "mtn"
+                    ? "background: #EAF7E9;"
+                    : ""}
                 >
                   <div class="flex items-center gap-3">
                     <span
-                      class="w-8 h-6 bg-[#FFCC00] rounded flex items-center justify-center text-[9px] font-black text-slate-950 shadow-xs"
+                      class="w-8 h-6 bg-[#FFCC00] rounded-md flex items-center justify-center text-[9px] font-black text-gray-950"
                       >momo</span
                     >
-                    <span class="text-xs font-bold text-slate-900"
+                    <span class="text-[13px] font-bold text-gray-900"
                       >MTN MoMo</span
                     >
                   </div>
@@ -1017,7 +1125,7 @@
                     class="w-4 h-4 rounded-full border flex items-center justify-center {paymentProvider ===
                     'mtn'
                       ? 'border-[#0aad0a]'
-                      : 'border-slate-300'}"
+                      : 'border-gray-300'}"
                   >
                     {#if paymentProvider === "mtn"}
                       <div class="w-2 h-2 rounded-full bg-[#0aad0a]"></div>
@@ -1029,16 +1137,19 @@
                   type="button"
                   onclick={() => (paymentProvider = "airtel")}
                   class="p-3.5 rounded-xl border-2 transition-all flex items-center justify-between focus:outline-none text-left cursor-pointer
-                    {paymentProvider === 'airtel'
-                    ? 'border-[#0aad0a] bg-emerald-50/10'
-                    : 'border-slate-200 bg-white hover:border-slate-300'}"
+          {paymentProvider === 'airtel'
+                    ? 'border-[#0aad0a]'
+                    : 'border-gray-200 bg-white hover:border-gray-300'}"
+                  style={paymentProvider === "airtel"
+                    ? "background: #EAF7E9;"
+                    : ""}
                 >
                   <div class="flex items-center gap-3">
                     <span
-                      class="w-8 h-6 bg-[#E11900] rounded flex items-center justify-center text-[9px] font-black text-white shadow-xs"
+                      class="w-8 h-6 bg-[#E11900] rounded-md flex items-center justify-center text-[9px] font-black text-white"
                       >airtel</span
                     >
-                    <span class="text-xs font-bold text-slate-900"
+                    <span class="text-[13px] font-bold text-gray-900"
                       >Airtel Money</span
                     >
                   </div>
@@ -1046,7 +1157,7 @@
                     class="w-4 h-4 rounded-full border flex items-center justify-center {paymentProvider ===
                     'airtel'
                       ? 'border-[#0aad0a]'
-                      : 'border-slate-300'}"
+                      : 'border-gray-300'}"
                   >
                     {#if paymentProvider === "airtel"}
                       <div class="w-2 h-2 rounded-full bg-[#0aad0a]"></div>
@@ -1057,13 +1168,13 @@
 
               <div
                 class="border rounded-[14px] px-4 pt-2.5 pb-3 flex flex-col bg-white transition-colors
-                {phoneNumberInput.length > 0 && !isMomoValid
-                  ? 'border-red-500 focus-within:border-red-500 focus-within:ring-red-500'
-                  : 'border-slate-300 focus-within:border-[#1a1a1a] focus-within:ring-[#1a1a1a]'}"
+        {phoneNumberInput.length > 0 && !isMomoValid
+                  ? 'border-rose-500 focus-within:border-rose-500'
+                  : 'border-gray-300 focus-within:border-[#0aad0a]'}"
               >
                 <label
                   for="payment-phone"
-                  class="text-[11px] text-neutral-500 font-normal select-none mb-0.5"
+                  class="text-[11px] text-gray-500 font-medium select-none mb-0.5"
                   >Mobile Wallet Phone Number</label
                 >
                 <input
@@ -1071,7 +1182,7 @@
                   id="payment-phone"
                   bind:value={phoneNumberInput}
                   placeholder="+256 772 123456"
-                  class="outline-none text-[15px] text-[#333] bg-transparent w-full p-0 border-0 focus:ring-0 leading-normal font-mono text-xs"
+                  class="outline-none text-[14px] text-gray-800 bg-transparent w-full p-0 border-0 focus:ring-0 leading-normal font-medium"
                 />
               </div>
             </div>
