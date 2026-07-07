@@ -1,11 +1,5 @@
-// Inside lib/config/api.js [5]
+// lib/config/api.js
 import axios from 'axios';
-
-const BASE_URL = import.meta.env.VITE_APP_BASE_URL || '';
-const EPOSTA_URL = import.meta.env.VITE_APP_EPOSTA_URL || '';
-const SHIPPING_URL = import.meta.env.VITE_APP_SHIPPING_URL || '';
-const API_KEY = import.meta.env.VITE_APP_API_KEY || '';
-const API_SECRET = import.meta.env.VITE_APP_API_SECRET || '';
 
 const SKIP_REFRESH_ENDPOINTS = [
   '/auth/login',
@@ -21,27 +15,25 @@ function shouldSkipRefresh(url) {
   return SKIP_REFRESH_ENDPOINTS.some(endpoint => url.includes(endpoint));
 }
 
+// Map relative paths to hit SvelteKit server endpoints directly
 export const publicApi = axios.create({
-  baseURL: `${BASE_URL}/api/v1`,
+  baseURL: '/api/v1',
   withCredentials: true
 });
 
 export const authApi = axios.create({
-  baseURL: `${BASE_URL}/api/v1`,
+  baseURL: '/api/v1',
   withCredentials: true,
 });
 
 export const integrationApi = axios.create({
-  baseURL: `${EPOSTA_URL}/api/v1`
+  baseURL: '/api/v1/eposta',
+  withCredentials: true
 });
 
 export const shippingApi = axios.create({
-  baseURL: `${SHIPPING_URL}/api/v1`,
-  withCredentials: true,
-  headers: {
-    'api-key': API_KEY,
-    'api-secret': API_SECRET
-  }
+  baseURL: '/api/v1/shipping',
+  withCredentials: true
 });
 
 let isRefreshing = false;
@@ -58,7 +50,6 @@ const processQueue = (error, token = null) => {
   failedQueue = [];
 };
 
-// FIXED: Parses Bearer access_token from the "credentials" JSON object
 const addTokenInterceptor = (config) => {
   if (typeof window !== 'undefined') {
     const credsStr = sessionStorage.getItem('credentials');
@@ -80,7 +71,6 @@ const addTokenInterceptor = (config) => {
 authApi.interceptors.request.use(addTokenInterceptor, (err) => Promise.reject(err));
 shippingApi.interceptors.request.use(addTokenInterceptor, (err) => Promise.reject(err));
 
-// FIXED: Manages the auto-refresh loop using the nested refresh_token properties
 authApi.interceptors.response.use(
   (response) => response,
   async (error) => {
@@ -113,11 +103,10 @@ authApi.interceptors.response.use(
           refreshToken = credentials.refresh_token;
         }
 
-        const response = await publicApi.post('auth/refresh-token', { refresh_token: refreshToken });
+        const response = await publicApi.post('/auth/refresh-token', { refresh_token: refreshToken });
         const { access_token, refresh_token } = response.data;
         
         if (access_token) {
-          // Write updated credentials block back to sessionStorage
           const updatedCredentials = {
             access_token,
             refresh_token: refresh_token || refreshToken

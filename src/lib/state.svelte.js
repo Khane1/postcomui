@@ -3,6 +3,15 @@ import { products as defaultProducts } from './data/products.js';
 import { publicApi, authApi, integrationApi, shippingApi } from './config/api.js';
 import { mapBackendProductToUI, mapBackendBrandToUI,resolveImageUrl } from './utils/mappers.js';
 import { goto } from '$app/navigation';
+const DEBUG = false;
+
+const logger = {
+  log: (...args) => { if (DEBUG) console.log(...args); },
+  warn: (...args) => { if (DEBUG) console.warn(...args); },
+  error: (...args) => { if (DEBUG) console.error(...args); }
+};
+
+
 // Import update
 class AppState {
   searchQuery = $state("");
@@ -44,6 +53,9 @@ class AppState {
   banners = $state([]);
   isLoading = $state(false);
 
+  
+
+
   get cartCount() {
     return this.cartItems.reduce((acc, item) => acc + item.quantity, 0);
   }
@@ -59,51 +71,30 @@ class AppState {
     return `${first} ${last}`.trim() || this.user.username || "Postal Customer";
   }
 
-  // FIXED: Parse access token from correct "credentials" key on start
   initAuth() {
     if (typeof window !== 'undefined') {
-      let token = null;
       const credsStr = sessionStorage.getItem('credentials');
       if (credsStr) {
         try {
           const credentials = JSON.parse(credsStr);
-          token = credentials.access_token;
-        } catch (e) {
-          token = null;
-        }
+          if (credentials.access_token) {
+            this.isLoggedIn = true;
+          }
+        } catch (e) {}
       }
       const savedUser = sessionStorage.getItem('userProfile');
-      const savedFavorites = localStorage.getItem('userFavorites');
-
-      if (token) {
-        this.isLoggedIn = true;
-        if (savedUser) {
-          try {
-            this.user = JSON.parse(savedUser) || null;
-          } catch (e) {
-            this.user = null;
-          }
-        }
-        this.fetchProfile();
-        this.fetchCustomerAddresses();
-        this.fetchPaymentMethods();
-        this.fetchWishlist();
-        this.fetchOrders();
+      if (savedUser && this.isLoggedIn) {
+        try { this.user = JSON.parse(savedUser) || null; } catch (e) { this.user = null; }
       }
-      
+      const savedFavorites = localStorage.getItem('userFavorites');
       if (savedFavorites) {
         try {
           const parsed = JSON.parse(savedFavorites);
-          // Enforce array type to prevent stringified null values from converting favorites
           this.favorites = Array.isArray(parsed) ? parsed : [];
-        } catch (e) {
-          this.favorites = [];
-        }
+        } catch (e) { this.favorites = []; }
       } else {
         this.favorites = [];
       }
-      this.fetchRegions();
-      this.fetchPickupCenters();
     }
   }
 
@@ -141,7 +132,7 @@ class AppState {
         raw: hit
       }));
     } catch (err) {
-      console.warn("[Autocomplete API] Failed to fetch search suggestions:", err);
+      logger.warn("[Autocomplete API] Failed to fetch search suggestions:", err);
       this.searchSuggestions = [];
     } finally {
       this.isSearchingSuggestions = false;
@@ -164,9 +155,9 @@ class AppState {
       // Synchronize flat tracking IDs array
       this.favorites = this.wishlistProducts.map(p => p.id);
 
-      console.log("[Wishlist State] Mapped products synced successfully:", this.favorites);
+      logger.log("[Wishlist State] Mapped products synced successfully:", this.favorites);
     } catch (err) {
-      console.warn("Could not retrieve wishlist from backend, using local fallbacks.", err);
+      logger.warn("Could not retrieve wishlist from backend, using local fallbacks.", err);
     }
   }
 // POST /api/v1/orders/{id}/payments - Registers order payment intent
@@ -178,10 +169,10 @@ class AppState {
         phone_number: phoneNumber || null
       };
       const res = await authApi.post(`orders/${orderId}/payments`, payload);
-      console.log("[Payment API] addOrderPayment response:", res.data);
+      logger.log("[Payment API] addOrderPayment response:", res.data);
       return { success: true, data: res.data };
     } catch (err) {
-      console.error("[Payment API Error] Failed to link order payment:", err);
+      logger.error("[Payment API Error] Failed to link order payment:", err);
       return { success: false, error: err.response?.data?.message || "Failed to link payment." };
     }
   }
@@ -190,10 +181,10 @@ class AppState {
   async payOrder(orderId, payload = {}) {
     try {
       const res = await authApi.post(`orders/${orderId}/pay`, payload);
-      console.log("[Payment API] payOrder result:", res.data);
+      logger.log("[Payment API] payOrder result:", res.data);
       return { success: true, data: res.data };
     } catch (err) {
-      console.error("[Payment API Error] Payment dispatch failed:", err);
+      logger.error("[Payment API Error] Payment dispatch failed:", err);
       return { success: false, error: err.response?.data?.message || "Payment execution failed." };
     }
   }
@@ -226,7 +217,7 @@ class AppState {
           await authApi.post('wishlist', { product_id: productId });
         }
       } catch (err) {
-        console.error("[Wishlist Sync Error] Failed to persist wishlist changes:", err);
+        logger.error("[Wishlist Sync Error] Failed to persist wishlist changes:", err);
         this.addToast("Failed to sync favorites with server. Reverting changes.", "error");
         
         if (isFav) {
@@ -328,9 +319,9 @@ class AppState {
       }
       
       this.availablePaymentMethods = rawList;
-      console.log("[Payment Methods State] Successfully synchronized payment methods:", this.availablePaymentMethods);
+      logger.log("[Payment Methods State] Successfully synchronized payment methods:", this.availablePaymentMethods);
     } catch (err) {
-      console.warn("Could not retrieve live payment methods, using local presets.", err);
+      logger.warn("Could not retrieve live payment methods, using local presets.", err);
     }
   }
   // POST /api/v1/auth/set-password
@@ -388,7 +379,7 @@ class AppState {
         sessionStorage.setItem('userProfile', JSON.stringify(this.user));
       }
     } catch (err) {
-      console.warn("[Profile Sync] Could not fully synchronize user credentials:", err);
+      logger.warn("[Profile Sync] Could not fully synchronize user credentials:", err);
     }
   }
 
@@ -425,13 +416,11 @@ class AppState {
         marketing_preferences: marketingPreferences ? 'true' : 'false' // Matches stringified boolean parameter
       };
       
-      alert(JSON.stringify(payload))
       const response = await authApi.post('customers', payload);
       this.addToast("Onboarding profile setup completed!");
       await this.fetchProfile();
       return { success: true, data: response.data };
     } catch (err) {
-      alert(JSON.stringify(err.response))
       const message = err.response?.data?.message || "Profile completion failed.";
       this.addToast(message, "error");
       return { success: false, error: message };
@@ -461,7 +450,7 @@ class AppState {
       
       return res.data;
     } catch (error) {
-      console.log(error);
+      logger.log(error);
     }
   }
 
@@ -481,7 +470,7 @@ class AppState {
 
     const customerId = this.user?.id || this.user?.customer_id || this.user?.customer?.id;
     if (!customerId) {
-      console.warn("[Address Fetch] Active customer ID is not resolved yet.");
+      logger.warn("[Address Fetch] Active customer ID is not resolved yet.");
       return;
     }
 
@@ -530,9 +519,9 @@ class AppState {
         this.activeBranch = defaultAddr.street || defaultAddr.line1;
       }
 
-      console.log("[Address Fetch] Successfully parsed and mapped", this.customerAddresses.length, "destinations.");
+      logger.log("[Address Fetch] Successfully parsed and mapped", this.customerAddresses.length, "destinations.");
     } catch (err) {
-      console.error("[Address Fetch] Failed to retrieve customer addresses:", err);
+      logger.error("[Address Fetch] Failed to retrieve customer addresses:", err);
     }
   }
   // PUT /api/v1/addresses/delivery/{id}/set-default
@@ -542,16 +531,17 @@ class AppState {
       await this.fetchCustomerAddresses();
       this.addToast("Default address updated.");
     } catch (err) {
-      console.warn("Failed to set default address.", err);
+      logger.warn("Failed to set default address.", err);
     }
   }
 
   // ── GEOGRAPHIC REGIONAL LOOKUPS ──────────────
 
   // GET /api/v1/addresses/regions
- async fetchRegions() {
+  async fetchRegions() {
+    if (!this.isLoggedIn) return;
     try {
-      const response = await publicApi.get('addresses/regions', { params: { per_page: 100 } });
+      const response = await publicApi.get('addresses/regions', { params: { per_page: 100 }, timeout: 3000 });
       const data = response.data !== undefined ? response.data : response;
       
       let rawRegions = [];
@@ -567,7 +557,7 @@ class AppState {
       
       this.allRegions = rawRegions;
     } catch (err) {
-      console.warn("Could not retrieve regional directory list.", err);
+      logger.warn("Could not retrieve regional directory list.", err);
     }
   }
 
@@ -579,7 +569,7 @@ class AppState {
       const data = response.data !== undefined ? response.data : response;
       this.regionCities = Array.isArray(data) ? data : (data.content || data.data || []);
     } catch (err) {
-      console.warn("Could not fetch regional cities dataset.", err);
+      logger.warn("Could not fetch regional cities dataset.", err);
     }
   }
 
@@ -588,10 +578,10 @@ class AppState {
 
   // GET /api/v1/deliveries/fees?delivery_method=&package_weight=&delivery_address_id=&pickup_center_id=
     async fetchPickupCenters() {
+    if (!this.isLoggedIn) return;
     try {
-      const response = await publicApi.get('addresses/pickup-centers', { params: { per_page: 100 } });
+      const response = await publicApi.get('addresses/pickup-centers', { params: { per_page: 100 }, timeout: 3000 });
       
-      // Defensively support both Axios-wrapped and direct unwrapped responses
       const data = response.data !== undefined ? response.data : response;
       
       let rawCenters = [];
@@ -613,9 +603,9 @@ class AppState {
         this.activeBranch = rawCenters[0].name;
       }
       
-      console.log("[Pickup Centers State] Loaded pickup locations:", this.allPickUpCenters);
+      logger.log("[Pickup Centers State] Loaded pickup locations:", this.allPickUpCenters);
     } catch (err) {
-      console.warn("Could not load postal smart pickup centers list.", err);
+      logger.warn("Could not load postal smart pickup centers list.", err);
     }
   }
 
@@ -646,61 +636,35 @@ class AppState {
 
   async fetchProducts() {
     this.isLoading = true;
+
+    // Always use local data immediately — instant, no network
+    this.allProducts = defaultProducts;
+    this.isLoading = false;
+
+    // Fire-and-forget API sync only when logged in
+    if (!this.isLoggedIn || this.searchQuery) return;
+
     try {
-      let response;
-      if (this.searchQuery) {
-        response = await publicApi.get('search/products', {
-          params: {
-            q: this.searchQuery,
-            per_page: 100,
-            is_published: true
-          }
-        });
-      } else {
-        response = await publicApi.get('products', {
-          params: {
-            page: 1,
-            perPage: 100,
-            is_published: true,
-            category_id: this.selectedCategory !== 'All' ? this.selectedCategory : undefined
-          }
-        });
-      }
-      
+      const response = await publicApi.get('products', {
+        params: { page: 1, perPage: 100, is_published: true },
+        timeout: 3000
+      });
       const data = response.data !== undefined ? response.data : response;
-      
+
       let rawList = [];
       if (data) {
-        if (Array.isArray(data)) {
-          rawList = data;
-        } else if (data.hits && Array.isArray(data.hits)) {
-          rawList = data.hits;
-        } else if (data.content && Array.isArray(data.content)) {
-          rawList = data.content;
-        } else if (data.products && Array.isArray(data.products)) {
-          rawList = data.products;
-        } else if (data.data && Array.isArray(data.data)) {
-          rawList = data.data;
-        } else if (data.items && Array.isArray(data.items)) {
-          rawList = data.items;
-        }
+        if (Array.isArray(data)) rawList = data;
+        else if (data.content && Array.isArray(data.content)) rawList = data.content;
+        else if (data.products && Array.isArray(data.products)) rawList = data.products;
+        else if (data.data && Array.isArray(data.data)) rawList = data.data;
       }
 
-      this.allProducts = rawList.map(mapBackendProductToUI).filter(Boolean);
-
-      // Fallback to default local products ONLY when no search query is active
-      if (this.allProducts.length === 0 && !this.searchQuery) {
-        this.allProducts = defaultProducts;
+      const mapped = rawList.map(mapBackendProductToUI).filter(Boolean);
+      if (mapped.length > 0) {
+        this.allProducts = mapped;
       }
     } catch (err) {
-      console.warn("[Products State] Failed to load from API. Falling back to local data.", err);
-      if (!this.searchQuery) {
-        this.allProducts = defaultProducts;
-      } else {
-        this.allProducts = []; // Maintain empty result state for failed API queries
-      }
-    } finally {
-      this.isLoading = false;
+      logger.warn("[Products] API sync failed, keeping local data.", err);
     }
   }
 
@@ -722,47 +686,44 @@ class AppState {
         id: String(c.id || c.value || ""),
         label: c.label || c.name || c.country || ""
       })).filter(c => c.id);
-      console.log("[Shipping Countries State] Loaded shipping destinations:", this.shippingCountries);
+      logger.log("[Shipping Countries State] Loaded shipping destinations:", this.shippingCountries);
     } catch (err) {
-      console.warn("Could not load shipping destinations list.", err);
+      logger.warn("Could not load shipping destinations list.", err);
       this.shippingCountries = [];
     }
   }
 
 // Method update
   async fetchBanners() {
+    this.banners = [];
+    if (!this.isLoggedIn) return;
     try {
-      const response = await publicApi.get('banners');
+      const response = await publicApi.get('banners', { timeout: 3000 });
       const data = response.data !== undefined ? response.data : response;
       
       let rawList = [];
       if (data) {
-        if (Array.isArray(data)) {
-          rawList = data;
-        } else if (data.content && Array.isArray(data.content)) {
-          rawList = data.content;
-        } else if (data.banners && Array.isArray(data.banners)) {
-          rawList = data.banners;
-        } else if (data.data && Array.isArray(data.data)) {
-          rawList = data.data;
-        }
+        if (Array.isArray(data)) rawList = data;
+        else if (data.content && Array.isArray(data.content)) rawList = data.content;
+        else if (data.banners && Array.isArray(data.banners)) rawList = data.banners;
+        else if (data.data && Array.isArray(data.data)) rawList = data.data;
       }
-      this.banners = rawList.map(b => ({
+      const mapped = rawList.map(b => ({
         id: b.id,
         image: resolveImageUrl(b.image),
         caption: b.caption || b.alt || "",
         url: b.url || "",
         bgPosition: b.bgPosition || b.bg_position || 'center center'
       }));
-    } catch (err) {
-      this.banners = [];
-    }
+      if (mapped.length > 0) this.banners = mapped;
+    } catch (err) {}
   }
 
 
   async fetchBrands() {
+    if (!this.isLoggedIn) return;
     try {
-      const response = await publicApi.get('brands');
+      const response = await publicApi.get('brands', { timeout: 3000 });
       const data = response.data;
       const rawList = Array.isArray(data) ? data : (data.content || data.brands || data.data || []);
       this.brands = rawList.map(mapBackendBrandToUI).filter(Boolean);
@@ -822,7 +783,7 @@ class AppState {
         apiItemId: item.id
       })).filter(entry => entry.product !== null);
     } catch (err) {
-      console.warn("Could not sync basket with backend.", err);
+      logger.warn("Could not sync basket with backend.", err);
     }
   }
 
@@ -837,7 +798,7 @@ class AppState {
         try {
           await authApi.put(`cart/items/${existing.apiItemId}`, { quantity: existing.quantity });
         } catch (err) {
-          console.warn("Could not save quantity changes to backend.", err);
+          logger.warn("Could not save quantity changes to backend.", err);
         }
       }
     } else {
@@ -849,7 +810,7 @@ class AppState {
           const res = await authApi.post('cart/items', { product_id: product.id, quantity });
           newEntry.apiItemId = res.data.id;
         } catch (err) {
-          console.warn("Could not add item on backend database.", err);
+          logger.warn("Could not add item on backend database.", err);
         }
       }
     }
@@ -870,7 +831,7 @@ class AppState {
         try {
           await authApi.put(`cart/items/${existing.apiItemId}`, { quantity: existing.quantity });
         } catch (err) {
-          console.warn("Could not update item quantity on backend.", err);
+          logger.warn("Could not update item quantity on backend.", err);
         }
       }
     } else {
@@ -879,7 +840,7 @@ class AppState {
         try {
           await authApi.delete(`cart/items/${existing.apiItemId}`);
         } catch (err) {
-          console.warn("Could not delete item from backend basket.", err);
+          logger.warn("Could not delete item from backend basket.", err);
         }
       }
     }
@@ -895,7 +856,7 @@ class AppState {
       try {
         await authApi.post('cart/clear');
       } catch (err) {
-        console.warn("Could not clear cart on backend.", err);
+        logger.warn("Could not clear cart on backend.", err);
       }
     }
   }
@@ -932,7 +893,7 @@ class AppState {
       
       return 5500; // Standard fallback
     } catch (err) {
-      console.warn("[Delivery Fee API] Fee calculation failed, defaulting.", err);
+      logger.warn("[Delivery Fee API] Fee calculation failed, defaulting.", err);
       return 5500;
     }
   }
@@ -958,7 +919,7 @@ class AppState {
   async createCustomerAddress(addressPayload) {
     const customerId = this.user?.id || this.user?.customer_id || this.user?.customer?.id;
     if (!customerId) {
-      console.error("[Address Save Error] No customerId resolved from authenticated session profile.");
+      logger.error("[Address Save Error] No customerId resolved from authenticated session profile.");
       this.addToast("Unable to save: Profile details are still loading. Please try again.", "error");
       return { success: false };
     }
@@ -981,7 +942,7 @@ class AppState {
         throw new Error(`Unexpected server response status: ${response.status}`);
       }
     } catch (err) {
-      console.error("[Address Save Error] Sequential save flow error:", err);
+      logger.error("[Address Save Error] Sequential save flow error:", err);
       const message = err.response?.data?.message || "Could not save delivery address.";
       this.addToast(message, "error");
       return { success: false, error: message };
@@ -1026,14 +987,14 @@ class AppState {
 
   async submitOrder(payload) {
     try {
-      console.log("[Checkout Sync] Clearing remote session cart...");
+      logger.log("[Checkout Sync] Clearing remote session cart...");
       try {
         await authApi.post('cart/clear');
       } catch (clearErr) {
-        console.warn("[Checkout Sync] Remote cart clear skipped or failed:", clearErr);
+        logger.warn("[Checkout Sync] Remote cart clear skipped or failed:", clearErr);
       }
 
-      console.log("[Checkout Sync] Synchronizing local cart to server-side database...");
+      logger.log("[Checkout Sync] Synchronizing local cart to server-side database...");
       // Sequentially upload each local cart item to establish the server-side cart session
       for (const item of this.cartItems) {
         if (item.product && item.product.id) {
@@ -1044,14 +1005,14 @@ class AppState {
         }
       }
 
-      console.log("checkout payload:", JSON.stringify(payload, null, 2));
+      logger.log("checkout payload:", JSON.stringify(payload, null, 2));
       
       // Convert the server-side cart into a registered order
       const res = await authApi.post('cart/checkout', payload);
       this.addToast("Order placed successfully!");
       return res.data;
     } catch (err) {
-      console.error("[API Error] Orders checkout submission failed:", err);
+      logger.error("[API Error] Orders checkout submission failed:", err);
       
       throw err; // Re-throw so that processOrder's catch block knows it failed
     }
@@ -1155,7 +1116,7 @@ class AppState {
             const orderData = res.data !== undefined ? res.data : res;
             return orderData;
           } catch (err) {
-            console.warn(`[Orders State] Enriching details failed for order ID: ${id}. Recovering fallback.`, err);
+            logger.warn(`[Orders State] Enriching details failed for order ID: ${id}. Recovering fallback.`, err);
             
             // Fallback recovery: preserve the order from flatList so it is not dropped
             const fallbackItem = flatList.find(item => (item.order_id || item.id) === id);
@@ -1165,9 +1126,9 @@ class AppState {
       );
 
       this.orders = detailedOrders.filter(Boolean);
-      console.log("[Orders State] Synced customer order list successfully:", this.orders);
+      logger.log("[Orders State] Synced customer order list successfully:", this.orders);
     } catch (err) {
-      console.warn("Could not retrieve customer orders.", err);
+      logger.warn("Could not retrieve customer orders.", err);
       this.orders = [];
     } finally {
       this.isLoading = false;
@@ -1186,7 +1147,7 @@ class AppState {
       const data = res.data !== undefined ? res.data : res;
       return { success: true, status: data.status || "PENDING_CONFIRMATION" };
     } catch (err) {
-      console.warn(`[Order Status Poll] Failed to retrieve status for ID: ${orderId}`, err);
+      logger.warn(`[Order Status Poll] Failed to retrieve status for ID: ${orderId}`, err);
       return { success: false, error: err };
     }
   }

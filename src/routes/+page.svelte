@@ -8,14 +8,6 @@
   import ProductCard from "$lib/components/cards&grids/ProductCard.svelte";
   import { untrack } from "svelte";
 
-  $effect(() => {
-    // Untrack to prevent search query keystrokes from triggering home-page API fetches
-    untrack(() => {
-      appState.fetchProducts();
-    });
-    appState.fetchBanners();
-    appState.fetchWishlist();
-  });
   // Dynamic derivation: maps flat IDs array to reactive bool index map [5]
   let favoritedMap = $derived(
     appState.favorites.reduce((acc, id) => {
@@ -52,7 +44,7 @@
   $effect(() => {
     appState.fetchProducts();
     appState.fetchBanners();
-    appState.fetchWishlist(); // Sync wishlist on entry [5]
+    appState.fetchWishlist();
   });
 
   function handleProductRedirect(product) {
