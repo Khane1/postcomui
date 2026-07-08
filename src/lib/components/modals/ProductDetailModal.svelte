@@ -181,6 +181,24 @@
       ? { major: str.slice(0, commaIndex), minor: str.slice(commaIndex) }
       : { major: str, minor: "" };
   });
+
+  let isZoomed = $state(false);
+  let zoomOrigin = $state("50% 50%");
+
+  function handleImageMouseMove(e) {
+    // Skip on touch/coarse-pointer devices
+    if (window.matchMedia("(pointer: coarse)").matches) return;
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    const y = ((e.clientY - rect.top) / rect.height) * 100;
+    zoomOrigin = `${x}% ${y}%`;
+    isZoomed = true;
+  }
+
+  function handleImageMouseLeave() {
+    isZoomed = false;
+  }
 </script>
 
 <svelte:head>
@@ -272,13 +290,18 @@
 
               <div
                 class="flex-1 aspect-square bg-gray-50 border border-gray-100 rounded-3xl relative overflow-hidden"
+                onmousemove={handleImageMouseMove}
+                onmouseleave={handleImageMouseLeave}
               >
                 <img
                   src={activeImageOverride ||
                     product.images[selectedThumbnailIndex]}
                   alt={product.name}
                   onerror={handleImageError}
-                  class="w-full h-full object-cover mix-blend-multiply transition-all duration-200"
+                  class="w-full h-full object-cover mix-blend-multiply transition-transform duration-200 ease-out cursor-zoom-in"
+                  style="transform-origin: {zoomOrigin}; transform: scale({isZoomed
+                    ? 2
+                    : 1});"
                 />
                 {#if product.badge}
                   <span
@@ -437,7 +460,6 @@
                 {/if}
               </div>
 
-            
               <!-- Corrected template variable referencing variationsToShow -->
               <!-- {#if variationsToShow.length > 0}
                 <div class="space-y-4 pt-3 border-t border-gray-100">
@@ -518,15 +540,14 @@
                   <span>Add to cart</span>
                 </button>
               {:else if product.stockStatus === "Out of stock" || product.stockStatus === "Sold Out"}
-             <div class="flex justify-center">
-
-              <div
-                   class="inline-flex items-center gap-1 text-[10.5px] font-bold mt-1.5 px-1.5 py-0.5 -ml-1.5 rounded-full text-rose-600"
-                 >
-                   <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
-                   <span>Out of stock</span>
-                 </div>
-             </div>
+                <div class="flex justify-center">
+                  <div
+                    class="inline-flex items-center gap-1 text-[10.5px] font-bold mt-1.5 px-1.5 py-0.5 -ml-1.5 rounded-full text-rose-600"
+                  >
+                    <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+                    <span>Out of stock</span>
+                  </div>
+                </div>
               {/if}
 
               <button
