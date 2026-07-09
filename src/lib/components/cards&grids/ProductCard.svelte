@@ -109,7 +109,7 @@
             src={product.placeholder}
             alt=""
             aria-hidden="true"
-            class="absolute inset-4 object-cover blur-md transition-opacity duration-300 {isLoaded
+            class="absolute inset-4 object-contain blur-md transition-opacity duration-300 {isLoaded
                 ? 'opacity-0'
                 : 'opacity-100'}"
         />
@@ -119,7 +119,7 @@
             loading="lazy"
             onload={() => (isLoaded = true)}
             onerror={handleImageError}
-            class="w-full h-full object-cover mix-blend-multiply transition-all duration-300 rounded-lg {isLoaded
+            class="w-full h-full object-contain mix-blend-multiply transition-all duration-300 rounded-lg {isLoaded
                 ? 'opacity-100 scale-100'
                 : 'opacity-0 scale-95'}"
         />

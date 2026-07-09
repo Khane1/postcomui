@@ -298,7 +298,7 @@
                     product.images[selectedThumbnailIndex]}
                   alt={product.name}
                   onerror={handleImageError}
-                  class="w-full h-full object-cover mix-blend-multiply transition-transform duration-200 ease-out cursor-zoom-in"
+                  class="w-full h-full object-contain mix-blend-multiply transition-transform duration-200 ease-out cursor-zoom-in"
                   style="transform-origin: {zoomOrigin}; transform: scale({isZoomed
                     ? 2
                     : 1});"
