@@ -1,8 +1,8 @@
 // lib/state.svelte.js
 import { publicApi, authApi } from './config/api.js';
-import { mapBackendProductToUI, mapBackendBrandToUI,resolveImageUrl } from './utils/mappers.js';
+import { mapBackendProductToUI, mapBackendBrandToUI, resolveImageUrl } from './utils/mappers.js';
 import { goto } from '$app/navigation';
-// Import update
+
 class AppState {
   searchQuery = $state("");
   selectedCategory = $state("All");
@@ -41,8 +41,10 @@ class AppState {
   allProducts = $state([]);
   brands = $state([]);
   banners = $state([]);
-  isLoading = $state(false);
-
+  // lib/state.svelte.js (around line 43)
+  categories = $state([]); 
+  searchFacets = $state(null); 
+  isLoading = $state(true); // <-- Initialize as true for immediate boot coverage
   _productsInFlight = false;
   _bannersInFlight = false;
 
@@ -61,7 +63,16 @@ class AppState {
     return `${first} ${last}`.trim() || this.user.username || "Postal Customer";
   }
 
-  // FIXED: Parse access token from correct "credentials" key on start
+  // Reactive getter to derive active categories based on live search facets
+  get activeCategories() {
+    const facetCategoryIds = this.searchFacets?.categories 
+      ? Object.keys(this.searchFacets.categories) 
+      : [];
+    return facetCategoryIds.length
+      ? this.categories.filter(cat => facetCategoryIds.includes(cat.id))
+      : this.categories;
+  }
+
   initAuth() {
     if (typeof window !== 'undefined') {
       let token = null;
@@ -96,7 +107,6 @@ class AppState {
       if (savedFavorites) {
         try {
           const parsed = JSON.parse(savedFavorites);
-          // Enforce array type to prevent stringified null values from converting favorites
           this.favorites = Array.isArray(parsed) ? parsed : [];
         } catch (e) {
           this.favorites = [];
@@ -150,28 +160,20 @@ class AppState {
     }
   }
 
-  // GET /api/v1/wishlist - Loads and maps all wishlist products [5]
   async fetchWishlist() {
     if (!this.isLoggedIn) return;
     try {
       const response = await authApi.get('wishlist');
       const data = response.data;
-
-      // Directly pull flat array or content depending on wrapper
       const rawList = Array.isArray(data) ? data : (data.content || data.data || []);
-
-      // Map Wishlist item models to Svelte UI product schemas
       this.wishlistProducts = rawList.map(mapBackendProductToUI).filter(Boolean);
-
-      // Synchronize flat tracking IDs array
       this.favorites = this.wishlistProducts.map(p => p.id);
-
       console.log("[Wishlist State] Mapped products synced successfully:", this.favorites);
     } catch (err) {
       console.warn("Could not retrieve wishlist from backend, using local fallbacks.", err);
     }
   }
-// POST /api/v1/orders/{id}/payments - Registers order payment intent
+
   async addOrderPayment(orderId, amount, paymentMethodId, phoneNumber) {
     try {
       const payload = {
@@ -188,7 +190,6 @@ class AppState {
     }
   }
 
-  // POST /api/v1/orders/{id}/pay - Finalizes and triggers the payment request
   async payOrder(orderId, payload = {}) {
     try {
       const res = await authApi.post(`orders/${orderId}/pay`, payload);
@@ -238,7 +239,7 @@ class AppState {
       }
     }
   }
-// POST /api/v1/cart/items - Sequentially uploads locally staged guest items to the database
+
   async mergeLocalCartToServer() {
     const token = this.accessToken;
     if (!token || this.cartItems.length === 0) return;
@@ -258,7 +259,6 @@ class AppState {
     }
   }
 
-  // FIXED: Synchronizes profile datasets and pushes local guest items to server
   async login(email, password) {
     try {
       const response = await publicApi.post('auth/login', { email, password });
@@ -275,7 +275,6 @@ class AppState {
       await this.fetchWishlist();
       await this.fetchOrders(); 
 
-      // Synchronize and merge local guest items to server database
       await this.mergeLocalCartToServer();
       await this.syncCartItems();
 
@@ -287,7 +286,7 @@ class AppState {
       return { success: false, error: message };
     }
   }
-  // POST /api/v1/auth/signup
+
   async signUp(firstName, lastName, email, phone) {
     try {
       const payload = {
@@ -310,7 +309,6 @@ class AppState {
     }
   }
 
-  // POST /api/v1/auth/verify-otp
   async verifyOtpCode(otpValue) {
     try {
       const payload = {
@@ -329,13 +327,11 @@ class AppState {
       return { success: false, error: message };
     }
   }
-// GET /api/v1/payments/methods - Retrieves active payment gateways
+
   async fetchPaymentMethods() {
     try {
       const api = this.isLoggedIn ? authApi : publicApi;
       const response = await api.get('payments/methods');
-      
-      // Defensively support both Axios-wrapped and direct unwrapped responses
       const data = response.data !== undefined ? response.data : response;
       
       let rawList = [];
@@ -357,7 +353,7 @@ class AppState {
       console.warn("Could not retrieve live payment methods, using local presets.", err);
     }
   }
-  // POST /api/v1/auth/set-password
+
   async setPassword(password, confirmPassword) {
     try {
       const payload = {
@@ -376,7 +372,6 @@ class AppState {
     }
   }
 
-  // POST /api/v1/auth/resend-otp
   async resendOtpCode() {
     try {
       const response = await publicApi.post('auth/resend-otp', {
@@ -393,16 +388,12 @@ class AppState {
     }
   }
 
-  // GET /api/v1/auth/profile
-   async fetchProfile() {
+  async fetchProfile() {
     try {
       const profileResponse = await authApi.get('auth/profile');
       const profileData = profileResponse.data !== undefined ? profileResponse.data : profileResponse;
-
-      // Fetch extended customer records to acquire customer ID
       const customerData = await this.getCurrentUser();
 
-      // Merge both payloads into a unified session profile
       this.user = {
         ...profileData,
         ...customerData
@@ -416,7 +407,6 @@ class AppState {
     }
   }
 
-  // PUT /api/v1/auth/profile
   async updateProfile(data) {
     try {
       const payload = {
@@ -440,13 +430,12 @@ class AppState {
     }
   }
 
-  // POST /api/v1/customers
   async completeProfile(dateOfBirth, gender, marketingPreferences) {
     try {
       const payload = {
-        date_of_birth: dateOfBirth, // Format: YYYY-MM-DD
+        date_of_birth: dateOfBirth, 
         gender,
-        marketing_preferences: marketingPreferences ? 'true' : 'false' // Matches stringified boolean parameter
+        marketing_preferences: marketingPreferences ? 'true' : 'false' 
       };
       
       const response = await authApi.post('customers', payload);
@@ -460,7 +449,6 @@ class AppState {
     }
   }
 
-  // POST /api/v1/auth/change-password
   async changePassword(old_password, new_password, confirm_password) {
     try {
       await authApi.post('auth/change-password', {
@@ -476,28 +464,18 @@ class AppState {
       return { success: false, error: message };
     }
   }
+
   async getCurrentUser() {
     try {
-
       const res = await authApi.get('customers/current')
-      
       return res.data;
     } catch (error) {
       console.log(error);
     }
   }
 
-  // ── SAVED ADDRESSES ──────────────────────────
-
-  // GET /api/v1/customers/{customerId}/addresses
- 
-
   availablePaymentMethods = $state([]);
 
-  // Fetch available payment methods from GET /api/v1/payments/methods [7]
-  // GET /api/v1/auth/profile - Fetches or returns the cached active user profile
-
-  // GET /api/v1/customers/{customerId}/addresses
   async fetchCustomerAddresses() {
     this.user = await this.getCurrentUser();
 
@@ -511,7 +489,6 @@ class AppState {
       const response = await authApi.get(`customers/${customerId}/addresses`);
       const body = response;
 
-      // Determine array structure defensively
       let rawList = [];
       if (body) {
         if (Array.isArray(body)) {
@@ -525,7 +502,6 @@ class AppState {
         }
       }
 
-      // Map API fields safely to match your exact structural model
       this.customerAddresses = rawList.map(addr => ({
         id: String(addr.id || ""),
         building_name: addr.building_name || "",
@@ -545,7 +521,6 @@ class AppState {
         updated_at: addr.updated_at || ""
       }));
 
-      // Set the active selectedAddressId if not already set
       if (this.customerAddresses.length > 0 && !this.selectedAddressId) {
         const defaultAddr = this.customerAddresses.find(a => a.is_default) || this.customerAddresses[0];
         this.selectedAddressId = defaultAddr.id;
@@ -557,7 +532,7 @@ class AppState {
       console.error("[Address Fetch] Failed to retrieve customer addresses:", err);
     }
   }
-  // PUT /api/v1/addresses/delivery/{id}/set-default
+
   async setDefaultAddress(addressId) {
     try {
       await authApi.put(`addresses/delivery/${addressId}/set-default`);
@@ -568,10 +543,7 @@ class AppState {
     }
   }
 
-  // ── GEOGRAPHIC REGIONAL LOOKUPS ──────────────
-
-  // GET /api/v1/addresses/regions
- async fetchRegions() {
+  async fetchRegions() {
     try {
       const response = await publicApi.get('addresses/regions', { params: { per_page: 100 } });
       const data = response.data !== undefined ? response.data : response;
@@ -593,8 +565,7 @@ class AppState {
     }
   }
 
-  // GET /api/v1/addresses/cities/region/{regionId}
- async fetchCities(regionId) {
+  async fetchCities(regionId) {
     if (!regionId) return;
     try {
       const response = await publicApi.get(`addresses/cities/region/${regionId}`);
@@ -605,15 +576,9 @@ class AppState {
     }
   }
 
-
-  // ── LIVE DELIVERY FEE PROCESSING ─────────────
-
-  // GET /api/v1/deliveries/fees?delivery_method=&package_weight=&delivery_address_id=&pickup_center_id=
-    async fetchPickupCenters() {
+  async fetchPickupCenters() {
     try {
       const response = await publicApi.get('addresses/pickup-centers', { params: { per_page: 100 } });
-      
-      // Defensively support both Axios-wrapped and direct unwrapped responses
       const data = response.data !== undefined ? response.data : response;
       
       let rawCenters = [];
@@ -652,34 +617,34 @@ class AppState {
     goto("/");
   }
 
-  // toggleFavorite(productId) {
-  //   if (this.favorites.includes(productId)) {
-  //     this.favorites = this.favorites.filter(id => id !== productId);
-  //     this.addToast("Removed item from Favorites", "info");
-  //   } else {
-  //     this.favorites.push(productId);
-  //     this.addToast("Saved item to Favorites");
-  //   }
-
-  //   if (typeof window !== 'undefined') {
-  //     localStorage.setItem('userFavorites', JSON.stringify(this.favorites));
-  //   }
-  // }
-
   async fetchProducts() {
     if (this._productsInFlight) return;
     this._productsInFlight = true;
     this.isLoading = true;
 
     try {
+      const isUuid = this.selectedCategory && 
+                     (this.selectedCategory.includes('-') || this.selectedCategory.length > 15);
+
+      const filters = {};
+      if (isUuid) {
+        filters.categories = [this.selectedCategory];
+      }
+
       const params = this.searchQuery
         ? { q: this.searchQuery, per_page: 100, is_published: true }
-        : { page: 1, perPage: 100, is_published: true,
-            category_id: this.selectedCategory !== 'All' ? this.selectedCategory : undefined };
+        : { 
+            page: 1, 
+            per_page: 100, 
+            is_published: true,
+            ...(Object.keys(filters).length ? { filters: JSON.stringify(filters) } : {})
+          };
 
-      const endpoint = this.searchQuery ? 'search/products' : 'products';
+      const endpoint = 'search/products'; 
       const response = await publicApi.get(endpoint, { params, timeout: 15000 });
       const data = response.data !== undefined ? response.data : response;
+
+      this.searchFacets = data.facetDistribution || null;
 
       let rawList = [];
       if (data) {
@@ -704,6 +669,60 @@ class AppState {
     } finally {
       this.isLoading = false;
       this._productsInFlight = false;
+    }
+  }
+
+  // RESTORED: Dynamic product options fetcher [INDEX]
+  async fetchProductVariants(productId) {
+    try {
+      const response = await publicApi.get(`products/${productId}/variants`);
+      const data = response.data !== undefined ? response.data : response;
+      let rawList = [];
+      if (data) {
+        if (Array.isArray(data)) {
+          rawList = data;
+        } else if (data.data && Array.isArray(data.data)) {
+          rawList = data.data;
+        } else if (data.content && Array.isArray(data.content)) {
+          rawList = data.content;
+        }
+      }
+      return rawList.map(mapBackendProductToUI).filter(Boolean);
+    } catch (err) {
+      console.warn(`[Product Variants API] Failed to fetch variants for product ${productId}:`, err);
+      return [];
+    }
+  }
+
+  async fetchCategories() {
+    try {
+      const response = await publicApi.get('categories', { 
+        params: { 
+          page: 1, 
+          per_page: 100, 
+          is_active: true,
+          sort_by: 'name',
+          sort_order: 'asc'
+        } 
+      });
+      
+      const data = response.data !== undefined ? response.data : response;
+      
+      let rawList = [];
+      if (data) {
+        if (Array.isArray(data)) {
+          rawList = data;
+        } else if (data.content && Array.isArray(data.content)) {
+          rawList = data.content;
+        } else if (data.data && Array.isArray(data.data)) {
+          rawList = data.data;
+        }
+      }
+      this.categories = rawList;
+      console.log("[Categories State] Synchronized Dynamic Categories:", this.categories.length);
+    } catch (err) {
+      console.warn("[Categories State] Failed to fetch active categories:", err);
+      this.categories = [];
     }
   }
 
@@ -732,7 +751,6 @@ class AppState {
     }
   }
 
-// Method update
   async fetchBanners() {
     if (this._bannersInFlight || this.banners.length > 0) return;
     this._bannersInFlight = true;
@@ -902,8 +920,6 @@ class AppState {
     }
   }
 
-  // GET /api/v1/deliveries/fees - Queries weight & location delivery pricing
-  // GET /api/v1/deliveries/fees - Queries weight & location delivery pricing
   async getDeliveryFee(payload) {
     try {
       const res = await publicApi.get('deliveries/fees', {
@@ -919,7 +935,6 @@ class AppState {
       const details = res.data;
       this.deliveryFeeDetails = details;
       
-      // Parse the resolved fee or reconstruct manually as fallback
       const total = details.TotalFee || details.total_fee || details.fee;
       if (typeof total === 'number') {
         return total;
@@ -932,7 +947,7 @@ class AppState {
         return base + dist + wfee;
       }
       
-      return 5500; // Standard fallback
+      return 5500; 
     } catch (err) {
       console.warn("[Delivery Fee API] Fee calculation failed, defaulting.", err);
       return 5500;
@@ -950,13 +965,6 @@ class AppState {
     }
   }
 
-  // Inside lib/state.svelte.js [5]
-
-  // Registers delivery coordinate payloads to the customer's account addresses
-  // Inside lib/state.svelte.js [5]
-
-  // Inside lib/state.svelte.js [5]
-
   async createCustomerAddress(addressPayload) {
     const customerId = this.user?.id || this.user?.customer_id || this.user?.customer?.id;
     if (!customerId) {
@@ -967,17 +975,10 @@ class AppState {
 
     try {
       const response = await authApi.post(`addresses/delivery`, addressPayload);
-      // const response = await authApi.post(`customers/${customerId}/addresses`, addressPayload);
-      // Look for successful responses (status 200/201)
       if (response.status === 200 || response.status === 201) {
         this.addToast("Delivery address successfully saved to profile.");
-
-        // Refresh customer data
         await this.fetchProfile();
-
-        // Fetch addresses
         await this.fetchCustomerAddresses();
-
         return { success: true, data: response.data };
       } else {
         throw new Error(`Unexpected server response status: ${response.status}`);
@@ -989,7 +990,7 @@ class AppState {
       return { success: false, error: message };
     }
   }
-  // Syncing defensive resolution to addCustomerAddress as well
+
   async addCustomerAddress(addressPayload) {
     const customerId = this.user?.customer_id || this.user?.id || this.user?.customer?.id;
     if (!customerId) {
@@ -1022,10 +1023,6 @@ class AppState {
     }
   }
 
- // lib/state.svelte.js
-
-  // lib/state.svelte.js
-
   async submitOrder(payload) {
     try {
       console.log("[Checkout Sync] Clearing remote session cart...");
@@ -1036,7 +1033,6 @@ class AppState {
       }
 
       console.log("[Checkout Sync] Synchronizing local cart to server-side database...");
-      // Sequentially upload each local cart item to establish the server-side cart session
       for (const item of this.cartItems) {
         if (item.product && item.product.id) {
           await authApi.post('cart/items', {
@@ -1047,15 +1043,12 @@ class AppState {
       }
 
       console.log("checkout payload:", JSON.stringify(payload, null, 2));
-      
-      // Convert the server-side cart into a registered order
       const res = await authApi.post('cart/checkout', payload);
       this.addToast("Order placed successfully!");
       return res.data;
     } catch (err) {
       console.error("[API Error] Orders checkout submission failed:", err);
-      
-      throw err; // Re-throw so that processOrder's catch block knows it failed
+      throw err; 
     }
   }
 
@@ -1067,21 +1060,15 @@ class AppState {
     }, 3000);
   }
 
-  // GET /api/v1/orders/customer - Synchronizes customer order histories
-  // Getter groups and maps the raw backend format defensively to standard UI models
-  // GET /api/v1/orders/customer - Synchronizes customer order histories
-  // Getter groups and maps the raw backend objects according to structural interfaces
    get mappedOrders() {
     return (this.orders || []).map(order => {
       if (!order) return null;
 
-      // Defensive item-level array normalization
       const rawItems = order.order_items || order.items || order.lines || [];
       const orderItems = rawItems.map(item => {
         const qty = Number(item.quantity || item.qty || 1);
         const priceVal = Number(item.price || item.unit_price || 0);
         
-        // Dynamic subtotal calculation fallback
         const calculatedSubtotal = qty * priceVal;
         const totalVal = (item.total !== undefined && item.total !== null && Number(item.total) > 0)
           ? Number(item.total)
@@ -1104,13 +1091,11 @@ class AppState {
         };
       });
 
-      // Dynamic order-level grand total aggregation
       const calculatedGrandTotal = orderItems.reduce((acc, i) => acc + i.total, 0);
       const finalTotalAmount = (order.total_amount !== undefined && order.total_amount !== null && Number(order.total_amount) > 0)
         ? Number(order.total_amount)
         : calculatedGrandTotal;
 
-      // Safe cross-referencing
       const matchedPayment = (this.payments || []).find(p => 
         (p.reference && p.reference === order.reference) || 
         (p.notes && p.notes.includes(order.reference)) ||
@@ -1140,13 +1125,12 @@ class AppState {
         shipping_receiver_state: order.shipping_receiver_state || "",
         shipping_receiver_zip_code: order.shipping_receiver_zip_code || "",
         
-        // Resolved payment details
         payment_status: matchedPayment ? matchedPayment.status : (order.status === "CONFIRMED" ? "SUCCESSFUL" : "PENDING"),
         payment_method: matchedPayment ? (matchedPayment.payment_method || matchedPayment.payment_channel) : null
       };
     }).filter(Boolean);
   }
- // lib/state.svelte.js
+
  async getOrderDetails(orderId) {
     try {
       const res = await authApi.get(`orders/${orderId}`);
@@ -1156,8 +1140,6 @@ class AppState {
       return null;
     }
   }
-
-
 
   resolveOrderStatusUI(statusVal) {
     const s = (statusVal || "PENDING").toLowerCase();
@@ -1196,6 +1178,7 @@ class AppState {
       bgClass: "bg-amber-50",
     };
   }
+
    async fetchOrders() {
     if (!this.isLoggedIn) return;
     this.isLoading = true;
@@ -1228,7 +1211,6 @@ class AppState {
       }
       flatList = flatList.filter(Boolean);
 
-      // Extract unique order IDs and resolve detailed records in parallel
       const detailPromises = flatList.map(async (basicOrder) => {
         const orderId = basicOrder.id || basicOrder.order_id;
         if (!orderId) return basicOrder;
@@ -1239,7 +1221,7 @@ class AppState {
           return { ...basicOrder, ...detailData };
         } catch (detailErr) {
           console.error(`[Orders Detail Fetch Failed] Fallback applied for ID ${orderId}:`, detailErr);
-          return basicOrder; // Safe error-recovery fallback to basic flat object
+          return basicOrder; 
         }
       });
 
@@ -1252,12 +1234,6 @@ class AppState {
     }
   }
 
-  // lib/state.svelte.js (Add inside the AppState class, e.g., right after fetchOrders)
-
-  /**
-   * Retrieves the current detailed status of a specific order by ID
-   * @param {string|number} orderId 
-   */
    async getOrderStatus(orderId) {
     try {
       const res = await authApi.get(`orders/${orderId}`);
@@ -1269,13 +1245,11 @@ class AppState {
     }
   }
 
-
-  // PUT /api/v1/orders/{id}/cancel - Cancels an order [5]
   async cancelOrder(orderId) {
     try {
       await authApi.put(`orders/${orderId}/cancel`);
       this.addToast("Order cancelled successfully.");
-      await this.fetchOrders(); // Refresh lists
+      await this.fetchOrders(); 
       return { success: true };
     } catch (err) {
       const message = err.response?.data?.message || "Failed to cancel order.";
@@ -1284,8 +1258,5 @@ class AppState {
     }
   }
 }
-
-
-
 
 export const appState = new AppState();

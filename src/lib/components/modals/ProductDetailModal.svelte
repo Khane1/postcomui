@@ -1,4 +1,4 @@
-<!-- lib/components/ProductDetailModal.svelte -->
+<!-- lib/components/modals/ProductDetailModal.svelte -->
 <script>
   import { appState } from "$lib/state.svelte.js";
   import { products } from "$lib/data/products.js";
@@ -10,8 +10,17 @@
   const ACCENT = "#0aad0a";
 
   let product = $derived(appState.selectedProductForModal);
+  let activeOption = $state(null);
+
+  // Sync activeOption whenever master product changes
+  $effect(() => {
+    if (product) {
+      activeOption = product;
+    }
+  });
+
   let cartEntry = $derived(
-    appState.cartItems.find((item) => item.product.id === product?.id),
+    activeOption ? appState.cartItems.find((item) => item.product.id === activeOption.id) : null,
   );
   let quantityInCart = $derived(cartEntry ? cartEntry.quantity : 0);
   let selectedThumbnailIndex = $state(0);
@@ -23,80 +32,62 @@
   let selectedVariations = $state({});
   let activeImageOverride = $state(null);
 
-  // Dynamic Fallbacks for Categories (Shows when API array is empty)
+  // State for configurable product variants and specifications block
+  let variants = $state([]);
+  let isLoadingVariants = $state(false);
+  let specificationsExpanded = $state(false);
+
+  // Combine parent master product with sibling variants and safely deduplicate by ID to prevent duplicate keys
+  let allProductOptions = $derived.by(() => {
+    if (!product) return [];
+    const pool = [product, ...variants];
+    const seen = new Set();
+    const unique = [];
+    for (const item of pool) {
+      if (item && item.id && !seen.has(item.id)) {
+        seen.add(item.id);
+        unique.push(item);
+      }
+    }
+    return unique;
+  });
+
+  // Map variant name/value pairs
+  let groupedAttributes = $derived.by(() => {
+    if (!activeOption || !activeOption.attributes) return [];
+    return activeOption.attributes.map(attr => ({
+      name: attr.name,
+      value: attr.value
+    }));
+  });
+
+  // Mapped comma-separated category tree
+  let categoryNames = $derived.by(() => {
+    if (!activeOption || !activeOption.rawCategories || !activeOption.rawCategories.length) return 'Not specified';
+    return activeOption.rawCategories.map(c => c.name || c).join(', ');
+  });
+
+  // Direct SKU field
+  let sku = $derived(activeOption?.sku || 'N/A');
+
+  // Category tags
   let categoriesToShow = $derived(
-    product && product.categories && product.categories.length > 0
-      ? product.categories
+    activeOption && activeOption.categories && activeOption.categories.length > 0
+      ? activeOption.categories
       : [
-          { id: "cat-dummy-1", name: product?.category || "Agro Products" },
+          { id: "cat-dummy-1", name: activeOption?.category || "Agro Products" },
           { id: "cat-dummy-2", name: "Premium Sourced" },
           { id: "cat-dummy-3", name: "Cooperative Certified" },
         ],
   );
 
-  // Dynamic Fallbacks for Variations (Shows when API array is empty)
-  let variationsToShow = $derived(
-    product && product.variations && product.variations.length > 0
-      ? product.variations
-      : [
-          {
-            variationTypeId: "var-size",
-            variationType: "Pack Size",
-            variations: [
-              {
-                id: "v-size-sm",
-                label: "Standard 250g",
-                description: "Standard single size",
-                priceVariation: 0,
-                image: "",
-              },
-              {
-                id: "v-size-md",
-                label: "Value Pack 500g",
-                description: "Double size pack",
-                priceVariation: 1500,
-                image: "",
-              },
-              {
-                id: "v-size-lg",
-                label: "Bulk 1KG",
-                description: "Bulk family pack",
-                priceVariation: 3000,
-                image: "",
-              },
-            ],
-          },
-          {
-            variationTypeId: "var-style",
-            variationType: "Item Style",
-            variations: [
-              {
-                id: "v-style-trad",
-                label: "Traditional Family-Grown",
-                description: "Sourced from family lots",
-                priceVariation: 0,
-                image: "",
-              },
-              {
-                id: "v-style-org",
-                label: "100% Certified Organic",
-                description: "Pesticide-free certified soils",
-                priceVariation: 1000,
-                image: "",
-              },
-            ],
-          },
-        ],
-  );
-
-  // Compute total price incorporating selected variations additions
   let totalPrice = $derived.by(() => {
-    if (!product) return 0;
+    if (!activeOption) return 0;
     const additions = Object.values(selectedVariations).reduce(
       (acc, v) => acc + (v.priceVariation || 0),
       0,
     );
-    return product.price + additions;
+    return activeOption.price + additions;
   });
 
   function scrollToTop() {
@@ -108,14 +99,27 @@
     if (product) {
       selectedThumbnailIndex = 0;
       activeImageOverride = null;
-      selectedVariations = {}; // clear selections on switch
+      selectedVariations = {};
       scrollToTop();
+
+      if (product.type === 'configurable') {
+        isLoadingVariants = true;
+        variants = [];
+        appState.fetchProductVariants(product.id).then(res => {
+          variants = res;
+          isLoadingVariants = false;
+        }).catch(() => {
+          isLoadingVariants = false;
+        });
+      } else {
+        variants = [];
+      }
     }
   });
 
-  let detailsExpanded = $state(true);
+  let detailsExpanded = $state(false);
   let returnsExpanded = $state(false);
-  let isFavorited = $derived(appState.favorites.includes(product?.id));
+  let isFavorited = $derived(activeOption ? appState.favorites.includes(activeOption.id) : false);
 
   let suggestions = $derived(
     product
@@ -140,29 +144,25 @@
     }
   }
 
-  // Shared quantity setter backing both the stepper buttons
   function setQuantity(qty) {
-    if (!product) return;
+    if (!activeOption) return;
     qty = Math.max(1, Math.min(9, qty));
     if (cartEntry) {
       cartEntry.quantity = qty;
     } else {
-      appState.addCartItem(product, qty);
+      appState.addCartItem(activeOption, qty);
     }
   }
 
   function handleIncrement() {
-    if (!product) return;
-    appState.addCartItem(product);
-  }
-
-  function handleFavoriteToggle(id) {
-    appState.toggleFavorite(id);
+    if (!activeOption) return;
+    appState.addCartItem(activeOption);
   }
 
   function handleImageError(e) {
     const rawUrl =
-      activeImageOverride || product.images[selectedThumbnailIndex];
+      activeImageOverride || (activeOption && activeOption.images[selectedThumbnailIndex]);
+    if (!rawUrl) return;
     const filename = rawUrl.split("/").pop();
     const legacyUrl = `${import.meta.env.VITE_APP_BASE_URL || "https://api.postcom.labs.eposta.ug"}/images/${filename}`;
 
@@ -186,7 +186,6 @@
   let zoomOrigin = $state("50% 50%");
 
   function handleImageMouseMove(e) {
-    // Skip on touch/coarse-pointer devices
     if (window.matchMedia("(pointer: coarse)").matches) return;
 
     const rect = e.currentTarget.getBoundingClientRect();
@@ -210,7 +209,7 @@
   />
 </svelte:head>
 
-{#if product}
+{#if product && activeOption}
   <div
     class="fixed inset-0 z-120 bg-slate-950/40 flex items-end sm:items-center justify-center p-0 sm:p-4 select-none"
     style="font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;"
@@ -267,7 +266,7 @@
           <div class="md:col-span-7 space-y-6">
             <div class="flex gap-4 items-start w-full relative">
               <div class="flex flex-col gap-2 shrink-0 select-none">
-                {#each product.images as img, index}
+                {#each activeOption.images as img, index}
                   <button
                     onclick={() => {
                       selectedThumbnailIndex = index;
@@ -295,31 +294,31 @@
               >
                 <img
                   src={activeImageOverride ||
-                    product.images[selectedThumbnailIndex]}
-                  alt={product.name}
+                    activeOption.images[selectedThumbnailIndex]}
+                  alt={activeOption.name}
                   onerror={handleImageError}
                   class="w-full h-full object-contain mix-blend-multiply transition-transform duration-200 ease-out cursor-zoom-in"
                   style="transform-origin: {zoomOrigin}; transform: scale({isZoomed
                     ? 2
                     : 1});"
                 />
-                {#if product.badge}
+                {#if activeOption.badge}
                   <span
                     class="absolute top-4 left-4 bg-gray-900 text-white text-[10px] font-extrabold px-2.5 py-1 rounded-full z-10"
                   >
-                    {product.badge}
+                    {activeOption.badge}
                   </span>
                 {/if}
               </div>
             </div>
 
             <div class="space-y-2 pt-2">
-              {#if product.reviews}
+              {#if activeOption.reviews}
                 <div class="flex items-center gap-1.5 text-[13px] font-bold">
                   <span class="text-amber-400">★★★★★</span>
-                  <span class="text-gray-900">{product.rating}</span>
+                  <span class="text-gray-900">{activeOption.rating}</span>
                   <span class="text-gray-400 font-medium"
-                    >({product.reviews})</span
+                    >({activeOption.reviews})</span
                   >
                 </div>
               {/if}
@@ -327,10 +326,10 @@
               <h2
                 class="text-xl sm:text-[26px] font-extrabold text-gray-900 leading-tight tracking-tight"
               >
-                {product.name}
+                {activeOption.name}
               </h2>
               <p class="text-[13px] text-gray-500 font-medium">
-                {product.size}
+                {activeOption.size}
               </p>
 
               <!-- Mapped dynamic category tag list -->
@@ -349,13 +348,13 @@
 
               <button
                 onclick={() => {
-                  appState.selectedCategory = product.category;
+                  appState.selectedCategory = activeOption.category;
                   close();
                 }}
                 class="text-[13px] font-bold hover:underline cursor-pointer focus:outline-none block pt-2"
                 style="color: {ACCENT};"
               >
-                Shop all {product.seller}
+                Shop all {activeOption.seller}
               </button>
             </div>
 
@@ -386,7 +385,55 @@
                 </button>
                 {#if detailsExpanded}
                   <div class="pb-4 text-[14px] text-gray-600 leading-relaxed">
-                    {product.description}
+                    {activeOption.description}
+                  </div>
+                {/if}
+              </div>
+
+              <!-- Unified specifications section detailing compiled options, attributes, and SKU values -->
+              <div class="border-b border-gray-100">
+                <button
+                  onclick={() => (specificationsExpanded = !specificationsExpanded)}
+                  class="w-full flex items-center justify-between py-4 focus:outline-none text-left"
+                >
+                  <span class="text-[15px] font-extrabold text-gray-900"
+                    >Product Details</span
+                  >
+                  <svg
+                    class="w-4.5 h-4.5 text-gray-400 transition-transform {specificationsExpanded
+                      ? 'rotate-180'
+                      : ''}"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.5"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      d="M19 9l-7 7-7-7"
+                    />
+                  </svg>
+                </button>
+                {#if specificationsExpanded}
+                  <div class="pb-4 grid grid-cols-2 gap-y-3 gap-x-6 text-[13.5px] animate-in fade-in duration-200 font-sans">
+                    <!-- Standard Product Details (Categories, SKU) -->
+                    <div class="flex justify-between border-b border-gray-100/60 pb-2 col-span-2">
+                      <span class="text-gray-400 font-medium">Category</span>
+                      <span class="text-gray-500 font-semibold text-right">{categoryNames}</span>
+                    </div>
+                    <div class="flex justify-between border-b border-gray-100/60 pb-2 col-span-2 ">
+                      <span class="text-gray-400 font-medium">SKU</span>
+                      <span class="text-gray-500 font-semibold">{sku}</span>
+                    </div>
+
+                    <!-- Dynamic Attribute Specs -->
+                    {#each groupedAttributes as attr}
+                      <div class="flex justify-between border-b border-gray-100/60 pb-2 col-span-2 sm:col-span-1">
+                        <span class="text-gray-400 font-medium">{attr.name || 'Specification'}</span>
+                        <span class="text-gray-900 font-bold">{attr.value}</span>
+                      </div>
+                    {/each}
                   </div>
                 {/if}
               </div>
@@ -420,13 +467,13 @@
                     <div class="flex justify-between">
                       <span class="text-gray-400 font-medium">Origin</span><span
                         class="text-gray-900 font-bold"
-                        >{product.origin || "Local Co-op"}</span
+                        >{activeOption.origin || "Local Co-op"}</span
                       >
                     </div>
                     <div class="flex justify-between">
                       <span class="text-gray-400 font-medium">Altitude</span
                       ><span class="text-gray-900 font-bold"
-                        >{product.altitude || "Sustainable Sourced"}</span
+                        >{activeOption.altitude || "Sustainable Sourced"}</span
                       >
                     </div>
                     <div class="flex justify-between">
@@ -460,47 +507,42 @@
                 {/if}
               </div>
 
-              <!-- Corrected template variable referencing variationsToShow -->
-              <!-- {#if variationsToShow.length > 0}
-                <div class="space-y-4 pt-3 border-t border-gray-100">
-                  {#each variationsToShow as group}
-                    <div class="space-y-2">
-                      <span class="text-[12.5px] font-bold text-gray-500 block"
-                        >{group.variationType}</span
-                      >
-                      <div class="flex flex-wrap gap-2">
-                        {#each group.variations as variation}
-                          {@const isSelected =
-                            selectedVariations[group.variationType]?.id ===
-                            variation.id}
-
-                          <button
-                            onclick={() =>
-                              handleSelectVariation(
-                                group.variationType,
-                                variation,
-                              )}
-                            class="px-3.5 py-2 rounded-full border text-[13px] font-bold transition-all focus:outline-none text-left"
-                            style={isSelected
-                              ? `border-color: ${ACCENT}; color: ${ACCENT}; background: #EAF7E9;`
-                              : "border-color: #e5e7eb; color: #374151; background: #ffffff;"}
-                          >
-                            <span>{variation.label}</span>
-                            {#if variation.priceVariation}
-                              <span
-                                class="text-[11px] font-bold ml-1 opacity-70"
-                              >
-                                (+{variation.priceVariation.toLocaleString()} UGX)
-                              </span>
-                            {/if}
-                          </button>
-                        {/each}
-                      </div>
+              <!-- Available Configurable Options with direct Thumbnail Image rendering -->
+              {#if allProductOptions.length > 1}
+                <div class="space-y-2.5 pt-3 border-t border-gray-100">
+                  <span class="text-[12px] font-bold text-gray-500 block uppercase tracking-wider">Available Options</span>
+                  {#if isLoadingVariants}
+                    <div class="flex items-center gap-2 py-1.5 animate-pulse">
+                      <div class="w-4 h-4 rounded-full border-2 border-slate-200 border-t-[#0aad0a] animate-spin"></div>
+                      <span class="text-xs text-gray-400 font-medium">Loading choices...</span>
                     </div>
-                  {/each}
+                  {:else}
+                    <div class="flex flex-wrap gap-2">
+                      {#each allProductOptions as option (option.id)}
+                        {@const isSelected = option.id === activeOption?.id}
+                        <button
+                          onclick={() => { 
+                            activeOption = option; 
+                            selectedThumbnailIndex = 0; 
+                            activeImageOverride = null; 
+                          }}
+                          class="w-12 h-12 rounded-xl bg-white border-2 flex items-center justify-center p-1 focus:outline-none transition-all hover:border-gray-400 cursor-pointer"
+                          style={isSelected ? `border-color: ${ACCENT};` : 'border-color: #e5e7eb;'}
+                          title={option.name}
+                        >
+                          <img
+                            src={option.images[0]}
+                            alt={option.name}
+                            class="max-w-full max-h-full object-contain mix-blend-multiply"
+                          />
+                        </button>
+                      {/each}
+                    </div>
+                  {/if}
                 </div>
-              {/if} -->
-              {#if product.stockStatus === "Many in stock"}
+              {/if}
+
+              {#if activeOption.stockStatus === "Many in stock" || activeOption.stockStatus.includes("left")}
                 <div
                   class="flex items-center justify-between border border-gray-300 rounded-full overflow-hidden h-12"
                 >
@@ -539,7 +581,7 @@
                 >
                   <span>Add to cart</span>
                 </button>
-              {:else if product.stockStatus === "Out of stock" || product.stockStatus === "Sold Out"}
+              {:else if activeOption.stockStatus === "Out of stock" || activeOption.stockStatus === "Sold Out"}
                 <div class="flex justify-center">
                   <div
                     class="inline-flex items-center gap-1 text-[10.5px] font-bold mt-1.5 px-1.5 py-0.5 -ml-1.5 rounded-full text-rose-600"
@@ -551,7 +593,7 @@
               {/if}
 
               <button
-                onclick={() => appState.toggleFavorite(product.id)}
+                onclick={() => appState.toggleFavorite(activeOption.id)}
                 class="w-full border border-gray-200 hover:border-gray-300 text-gray-700 hover:text-gray-900 font-bold text-[13px] h-11 rounded-full transition-all focus:outline-none flex items-center justify-center gap-2 bg-white"
               >
                 <svg
@@ -574,7 +616,6 @@
           </div>
         </div>
 
-        <!-- Inside lib/components/modals/ProductDetailModal.svelte [5] -->
         {#if suggestions.length > 0}
           <div class="space-y-3 pt-4 border-t border-gray-100">
             <h4 class="text-[16px] font-extrabold text-gray-900 tracking-tight">
@@ -585,7 +626,6 @@
             >
               {#each suggestions as sug (sug.id)}
                 <div class="w-36 shrink-0 snap-start">
-                  <!-- FIXED: Added standard props to allow live favoriting & cart additions inside suggestions -->
                   <ProductCard
                     product={sug}
                     isFavorited={appState.favorites.includes(sug.id)}

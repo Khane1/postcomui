@@ -1,3 +1,4 @@
+<!-- routes/+layout.svelte -->
 <script>
   import "./layout.css";
   import { page } from "$app/state";
@@ -9,6 +10,7 @@
   import { onMount } from "svelte";
   import AccountSidebarNav from "$lib/components/sidebars/AccountSidebarNav.svelte";
   import Locationselection from "$lib/components/modals/locationselection.svelte";
+  import { fade } from "svelte/transition"; // Explicit transition import
   import {
     mapBackendProductToUI,
     resolveImageUrl,
@@ -54,7 +56,6 @@
     return "flex-1 min-w-0 p-4 sm:p-6 bg-white rounded-tl-3xl border-t border-l border-slate-100/5 2xl:px-20";
   });
 
-  // Track the local typed searchQuery to fetch live autocomplete suggestions (200ms debounce)
   $effect(() => {
     const q = searchQuery;
     clearTimeout(debounceTimer);
@@ -95,7 +96,6 @@
     appState.fulfillmentMode = mode;
   }
 
-  // Handle product searches via form submission
   function handleSearchSubmit(e) {
     e.preventDefault();
     appState.searchQuery = searchQuery;
@@ -118,6 +118,30 @@
 
 <ProductDetailModal />
 <CartDrawer />
+
+<!-- Centered Fullscreen Loading Overlay [INDEX] -->
+{#if appState.isLoading}
+  <div
+    transition:fade={{ duration: 250 }}
+    class="fixed inset-0 bg-white flex flex-col items-center justify-center z-[150] select-none pointer-events-auto"
+  >
+    <div class="flex flex-col items-center gap-4">
+      <div class="relative flex items-center justify-center">
+        <!-- Accent-colored pulsing backgrounds -->
+        <div class="absolute w-24 h-24 rounded-full bg-slate-100 animate-ping duration-1000"></div>
+        <div class="absolute w-20 h-20 rounded-full bg-slate-200 animate-pulse duration-1000"></div>
+        
+        <img
+          src="https://postcom.ug/assets/postcom-logo-white-B0oZfjq1.jpg"
+          class="size-16 rounded-full relative shadow border border-slate-100 animate-bounce-in"
+          alt="Postcom Logo"
+        />
+      </div>
+      
+    
+    </div>
+  </div>
+{/if}
 
 <div
   class="min-h-screen bg-white text-gray-800 flex flex-col"
@@ -216,7 +240,7 @@
         </button>
       </div>
 
-      <!-- Autocomplete Dropdown (Limit: 5) -->
+      <!-- Autocomplete Dropdown -->
       {#if isSearchFocused && appState.searchSuggestions.length > 0}
         <div
           class="absolute left-0 right-0 top-full mt-2 bg-white border border-gray-200 rounded-2xl shadow-lg z-50 overflow-hidden py-1.5 animate-in fade-in slide-in-from-top-2 duration-150"
@@ -299,7 +323,7 @@
           <path
             stroke-linecap="round"
             stroke-linejoin="round"
-            d="M15.75 10.5V6a3.75 3.75 0 1 0-7.5 0v4.5m11.356-1.993 1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 0 1-1.12-1.243l1.264-12A1.125 1.125 0 0 1 5.513 7.5h12.974c.576 0 1.059.435 1.119 1.007ZM8.625 10.5a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm7.5 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z"
+            d="M15.75 10.5V6a3.75 3.75 0 1 0-7.5 0v4.5m11.356-1.993 1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 0 1-1.12-1.243l1.264-12A1.125 1.125 0 0 1 5.513 7.5h12.974c.576 0 1.059.435 1.119 1.007ZM8.625 10.5a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm7.5 0a.375 3.75 0 1 1-.75 0 .375 3.75 0 0 1 .75 0Z"
           />
         </svg>
         <span>Cart</span>

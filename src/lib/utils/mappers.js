@@ -15,7 +15,7 @@ export function resolveImageUrl(url) {
   // Primary S3 Bucket Path Pattern
   const base = S3_BASE.replace(/\/+$/, '');
   const filename = cleanUrl.replace(/^\/+/, '');
-  
+
   return `${base}/${filename}`;
 }
 
@@ -46,8 +46,67 @@ export function normalizeCategory(item) {
   return "Agro Products"; 
 }
 
-// Ensure mapBackendProductToUI in lib/utils/mappers.js maps the numeric weight:
-// Complete mapBackendProductToUI mapping function inside lib/utils/mappers.js
+// // Ensure mapBackendProductToUI in lib/utils/mappers.js maps the numeric weight:
+// // Complete mapBackendProductToUI mapping function inside lib/utils/mappers.js
+// export function mapBackendProductToUI(item) {
+//   if (!item) return null;
+//   if (!item.id && !item.name) return null;
+
+//   // 1. Extract the distinct image parameters from backend payload
+//   let rawImages = [];
+//   if (item.front_image || item.back_image || item.side_image) {
+//     rawImages = [item.front_image, item.back_image, item.side_image].filter(Boolean);
+//   } else if (Array.isArray(item.images) && item.images.length > 0) {
+//     rawImages = item.images.map(img => typeof img === 'object' ? (img.url || img.path || '') : String(img)).filter(Boolean);
+//   } else if (item.image) {
+//     rawImages = [typeof item.image === 'object' ? (item.image.url || item.image.path || '') : String(item.image)];
+//   }
+
+//   // Generate resolved primary S3 URLs
+//   let images = rawImages.map(resolveImageUrl).filter(Boolean);
+
+//   if (images.length === 0) {
+//     images = ["https://images.unsplash.com/photo-1500937386664-56d1dfef3854?w=400"];
+//   }
+
+//   // 2. Parse price points
+//   const price = Number(item.price || item.basePrice || item.base_price || 0);
+//   const originalPrice = item.compare_at_price || item.old_price 
+//     ? Number(item.compare_at_price || item.old_price) 
+//     : undefined;
+
+//   // 3. Resolve category, seller, and stock status details
+//   const category = normalizeCategory(item);
+//   const seller = item.vendor_name || item.brand?.name || item.seller || "Local Co-op";
+//   const stock = typeof item.stock === 'number' ? item.stock : (item.inventory?.quantity ?? 10);
+//   const stockStatus = stock > 5 ? "Many in stock" : stock > 0 ? `Only ${stock} left` : "Out of stock";
+
+//   // Extract and default weight cleanly
+//   const weight = Number(item.weight || item.package_weight || 500); 
+
+//   return {
+//     id: item.id,
+//     name: item.name,
+//     category,
+//     price,
+//     originalPrice,
+//     rating: Number(item.rating || 4.5),
+//     reviews: Number(item.review_count || item.reviews || 0),
+//     seller,
+//     badge: item.badge || (item.is_featured ? "Featured" : null),
+//     stockStatus,
+//     origin: item.brand?.location || item.origin || "Uganda Region Sourced",
+//     altitude: item.weight ? `${item.weight}g` : (item.altitude || "1 each"),
+//     weight, // Preserved for exact weight-based shipping fee calculation
+//     description: item.description || item.short_description || "High-quality co-op verified produce.",
+//     images, // Safely resolved array
+//     placeholder: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'><rect width='100%' height='100%' fill='%23f1f5f9'/></svg>",
+//     rawCategories: item.categories || [],
+//     rawVariations: item.variations || []
+//   };
+// }
+// lib/utils/mappers.js
+
 export function mapBackendProductToUI(item) {
   if (!item) return null;
   if (!item.id && !item.name) return null;
@@ -102,7 +161,11 @@ export function mapBackendProductToUI(item) {
     images, // Safely resolved array
     placeholder: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'><rect width='100%' height='100%' fill='%23f1f5f9'/></svg>",
     rawCategories: item.categories || [],
-    rawVariations: item.variations || []
+    rawVariations: item.variations || [],
+    type: item.type || 'simple',
+    attributes: item.attributes || [],
+    sku: item.sku || '',
+    parent_id: item.parent_id || item.parentId || null
   };
 }
 export function mapBackendBrandToUI(brand) {

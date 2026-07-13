@@ -16,7 +16,6 @@
     let onlyInStock = $state(false);
     let isMobileFilterOpen = $state(false);
 
-    /// routes/products/+page.svelte
     let favoritedMap = $derived(
         (appState.favorites || []).reduce((acc, id) => {
             acc[id] = true;
@@ -24,16 +23,15 @@
         }, {}),
     );
 
-    const categoriesList = [
-        "Agro Products",
-        "Food & Beverages",
-        "Arts & Crafts",
-        "Health & Beauty",
-    ];
+    // Derive Categories loaded from GET api/v1/categories
+    let categoriesList = $derived(appState.categories);
 
     // Computes and sorts processed products reactively
     let processedProducts = $derived.by(() => {
         let list = [...appState.allProducts];
+
+        // 0. Filter out child variants so they don't display as duplicate cards in listing grids
+        list = list.filter(p => !p.parent_id);
 
         // 1. Text Search Filter
         if (appState.searchQuery) {
@@ -48,11 +46,17 @@
             );
         }
 
-        // 2. Category Filter
+        // 2. Category Filter supporting both dynamic Category IDs and normalized fallback labels
         if (selectedCategories.length > 0) {
-            list = list.filter((p) => selectedCategories.includes(p.category));
+            list = list.filter((p) => 
+                p.rawCategories.some(c => selectedCategories.includes(String(c.id || c))) ||
+                selectedCategories.includes(p.category)
+            );
         } else if (appState.selectedCategory !== "All") {
-            list = list.filter((p) => p.category === appState.selectedCategory);
+            list = list.filter((p) => 
+                p.rawCategories.some(c => String(c.id || c.name) === String(appState.selectedCategory)) ||
+                p.category === appState.selectedCategory
+            );
         }
 
         // 3. Price Bounds Filter
@@ -78,8 +82,13 @@
     });
 
     $effect(() => {
+        // Explicitly register dependencies to trigger refetch when selectedCategory or searchQuery changes
+        const _cat = appState.selectedCategory;
+        const _search = appState.searchQuery;
+
         appState.fetchProducts();
-        appState.fetchWishlist(); // Sync backend wishlist on load [5]
+        appState.fetchCategories(); // Fetch dynamic categories flat-list on mount
+        appState.fetchWishlist(); 
     });
 
     function handleProductRedirect(product) {
@@ -87,18 +96,18 @@
     }
 
     function handleFavoriteToggle(id) {
-        appState.toggleFavorite(id); // Synchronize directly with backend [5]
+        appState.toggleFavorite(id); 
     }
 
     function handleAddToCart(product) {
         appState.addCartItem(product);
     }
 
-    function toggleCategory(cat) {
-        if (selectedCategories.includes(cat)) {
-            selectedCategories = selectedCategories.filter((c) => c !== cat);
+    function toggleCategory(catId) {
+        if (selectedCategories.includes(String(catId))) {
+            selectedCategories = selectedCategories.filter((c) => c !== String(catId));
         } else {
-            selectedCategories.push(cat);
+            selectedCategories.push(String(catId));
         }
     }
 
@@ -230,7 +239,7 @@
                     class="flex-1 overflow-y-auto pt-4 pr-1 scrollbar-none h-full"
                 >
                     {#if processedProducts.length === 0}
-                        <!-- Elegant Empty State (Zero emojis) -->
+                        <!-- Elegant Empty State -->
                         <div
                             class="text-center py-20 space-y-5 max-w-sm mx-auto"
                         >
@@ -306,22 +315,20 @@
                         </button>
                     </div>
 
-                    <!-- Categories Section -->
+                    <!-- Dynamic Categories Section -->
                     <div class="space-y-3">
                         <span
                             class="text-[11px] font-semibold text-slate-400 tracking-wide uppercase block"
                             >Categories</span
                         >
-                        <div class="space-y-2.5">
-                            {#each categoriesList as cat}
-                                {@const isActive =
-                                    selectedCategories.includes(cat) ||
-                                    appState.selectedCategory === cat}
+                        <div class="space-y-2.5 max-h-60 overflow-y-auto pr-1 scrollbar-none">
+                            {#each categoriesList as cat (cat.id)}
+                                {@const isActive = selectedCategories.includes(String(cat.id)) || appState.selectedCategory === String(cat.id)}
                                 <button
-                                    onclick={() => toggleCategory(cat)}
+                                    onclick={() => toggleCategory(String(cat.id))}
                                     class="flex items-center gap-3 text-[13px] text-slate-700 hover:text-slate-950 transition-colors text-left focus:outline-none cursor-pointer group"
                                 >
-                                    <!-- Custom Crisp Checkbox -->
+                                    <!-- Custom Checkbox -->
                                     <div
                                         class="w-4.5 h-4.5 border rounded-[4px] flex items-center justify-center transition-all shrink-0
                                         {isActive
@@ -344,7 +351,7 @@
                                             </svg>
                                         {/if}
                                     </div>
-                                    <span class="font-light">{cat}</span>
+                                    <span class="font-light">{cat.name}</span>
                                 </button>
                             {/each}
                         </div>
@@ -391,7 +398,7 @@
                             onclick={() => (onlyInStock = !onlyInStock)}
                             class="flex items-center gap-3 text-[13px] text-slate-700 hover:text-slate-950 transition-colors focus:outline-none cursor-pointer group"
                         >
-                            <!-- Custom Crisp Checkbox -->
+                            <!-- Custom Checkbox -->
                             <div
                                 class="w-4.5 h-4.5 border rounded-[4px] flex items-center justify-center transition-all shrink-0
                                 {onlyInStock
@@ -451,20 +458,19 @@
                         class="text-[10px] font-black text-slate-400 uppercase tracking-wider block"
                         >Categories</span
                     >
-                    <div class="space-y-2">
-                        {#each categoriesList as cat}
+                    <div class="space-y-2 max-h-40 overflow-y-auto pr-1 scrollbar-none font-sans">
+                        {#each categoriesList as cat (cat.id)}
+                            {@const isActive = selectedCategories.includes(String(cat.id)) || appState.selectedCategory === String(cat.id)}
                             <button
-                                onclick={() => toggleCategory(cat)}
+                                onclick={() => toggleCategory(String(cat.id))}
                                 class="flex items-center gap-2.5 text-xs font-bold text-slate-600 hover:text-slate-900 transition-all text-left focus:outline-none"
                             >
                                 <div
-                                    class="w-4 h-4 border-2 rounded flex items-center justify-center transition-all
-                                  {selectedCategories.includes(cat) ||
-                                    appState.selectedCategory === cat
+                                    class="w-4 h-4 border-2 rounded flex items-center justify-center transition-all {isActive
                                         ? 'border-red-600 bg-red-600 text-white'
                                         : 'border-slate-300 bg-white'}"
                                 >
-                                    {#if selectedCategories.includes(cat) || appState.selectedCategory === cat}
+                                    {#if isActive}
                                         <svg
                                             class="w-2.5 h-2.5"
                                             fill="none"
@@ -479,7 +485,7 @@
                                         >
                                     {/if}
                                 </div>
-                                <span>{cat}</span>
+                                <span>{cat.name}</span>
                             </button>
                         {/each}
                     </div>
