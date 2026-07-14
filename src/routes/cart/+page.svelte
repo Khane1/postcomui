@@ -13,6 +13,9 @@
   let isCheckingStatus = $state(false);
   let currentOrderStatus = $state("PENDING_CONFIRMATION");
 
+  // Mobile Summary Expansion State
+  let isMobileSummaryOpen = $state(false);
+
   // Form payment routing states
   let paymentType = $state("momo"); // momo or card
   let paymentProvider = $state("mtn"); // mtn or airtel
@@ -676,7 +679,7 @@
   {:else}
     <!-- ACTIVE CHECKOUT VIEW -->
     <div
-      class="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start rounded-lg bg-slate-50 p-3"
+      class="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start rounded-lg bg-slate-50 p-3 pb-24 lg:pb-3"
     >
       <div class="lg:col-span-8 space-y-6">
         <!-- Fulfillment Mode -->
@@ -685,7 +688,7 @@
             <h3
               class="text-xs font-black text-slate-400 uppercase tracking-widest"
             >
-              Fulfillment Routing Mode
+              Delivery Options
             </h3>
           </div>
 
@@ -1100,12 +1103,12 @@
 
           {#if paymentType === "momo"}
             <div class="space-y-4 animate-in fade-in duration-200">
-              <div class="grid grid-cols-2 gap-3 select-none">
+              <div class="grid sm:grid-cols-2  gap-3 select-none">
                 <button
                   type="button"
                   onclick={() => (paymentProvider = "mtn")}
                   class="p-3.5 rounded-xl border-2 transition-all flex items-center justify-between focus:outline-none text-left cursor-pointer
-          {paymentProvider === 'mtn'
+                    {paymentProvider === 'mtn'
                     ? 'border-[#0aad0a]'
                     : 'border-gray-200 bg-white hover:border-gray-300'}"
                   style={paymentProvider === "mtn"
@@ -1137,7 +1140,7 @@
                   type="button"
                   onclick={() => (paymentProvider = "airtel")}
                   class="p-3.5 rounded-xl border-2 transition-all flex items-center justify-between focus:outline-none text-left cursor-pointer
-          {paymentProvider === 'airtel'
+                    {paymentProvider === 'airtel'
                     ? 'border-[#0aad0a]'
                     : 'border-gray-200 bg-white hover:border-gray-300'}"
                   style={paymentProvider === "airtel"
@@ -1168,7 +1171,7 @@
 
               <div
                 class="border rounded-[14px] px-4 pt-2.5 pb-3 flex flex-col bg-white transition-colors
-        {phoneNumberInput.length > 0 && !isMomoValid
+                  {phoneNumberInput.length > 0 && !isMomoValid
                   ? 'border-rose-500 focus-within:border-rose-500'
                   : 'border-gray-300 focus-within:border-[#0aad0a]'}"
               >
@@ -1209,7 +1212,7 @@
                 />
               </div>
 
-              <div class="grid grid-cols-2 gap-3">
+              <div class="grid sm:grid-cols-2 gap-3">
                 <div
                   class="border rounded-[14px] px-4 pt-2.5 pb-3 flex flex-col bg-white transition-colors
                   {cardExpiry.length > 0 && !isExpiryValid
@@ -1272,7 +1275,8 @@
         </div>
       </div>
 
-      <div class="lg:col-span-4 h-fit lg:sticky lg:top-24">
+      <!-- DESKTOP SUMMARY CARD (HIDDEN ON MOBILE) -->
+      <div class="hidden lg:block lg:col-span-4 h-fit lg:sticky lg:top-24">
         <div class="rounded-2xl p-6 bg-white space-y-5 shadow-xs">
           <h4
             class="text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-3"
@@ -1322,6 +1326,177 @@
             coordinates.
           </p>
         </div>
+      </div>
+    </div>
+
+    <!-- MOBILE FLOATING BOTTOM BAR -->
+    <div
+      class="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 shadow-[0_-8px_30px_rgba(0,0,0,0.08)] z-40 px-5 py-3 pb-safe"
+    >
+      <div class="flex items-center justify-between gap-4">
+        <button
+          type="button"
+          onclick={() => (isMobileSummaryOpen = true)}
+          class="flex flex-col text-left focus:outline-none"
+        >
+          <span
+            class="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1"
+          >
+            Subtotal
+            <svg
+              class="w-3 h-3 text-slate-500"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2.5"
+                d="M5 15l7-7 7 7"
+              />
+            </svg>
+          </span>
+          <span class="text-base font-extrabold text-slate-900">
+            {Math.max(0, total).toLocaleString()} UGX
+          </span>
+        </button>
+
+        <button
+          onclick={() => (isMobileSummaryOpen = true)}
+          class="flex-1 max-w-[180px] bg-[#0aad0a] hover:bg-[#099409] text-white font-extrabold text-xs h-11 rounded-full flex items-center justify-center transition-all shadow-md focus:outline-none cursor-pointer"
+        >
+          Pay
+        </button>
+      </div>
+    </div>
+
+    <!-- MOBILE EXPANDABLE BOTTOM DRAWER -->
+    {#if isMobileSummaryOpen}
+      <!-- Backdrop overlay -->
+      <button
+        class="lg:hidden fixed inset-0 bg-black/40 z-45 transition-opacity duration-300 border-0 cursor-default w-full text-left p-0"
+        onclick={() => (isMobileSummaryOpen = false)}
+        aria-label="Close summary"
+      ></button>
+    {/if}
+
+    <div
+      class="lg:hidden fixed bottom-0 left-0 right-0 bg-white rounded-t-3xl border-t border-slate-200 shadow-[0_-15px_30px_rgba(0,0,0,0.12)] z-50 transition-transform duration-300 transform max-h-[85vh] flex flex-col
+        {isMobileSummaryOpen ? 'translate-y-0' : 'translate-y-full'}"
+    >
+      <!-- Drawer Header -->
+      <div
+        class="flex items-center justify-between px-6 pt-5 pb-3 border-b border-slate-100 shrink-0"
+      >
+        <h4 class="text-xs font-black text-slate-400 uppercase tracking-widest">
+          Order Summary
+        </h4>
+        <button
+          type="button"
+          onclick={() => (isMobileSummaryOpen = false)}
+          class="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 transition-colors focus:outline-none"
+        >
+          <svg
+            class="w-4 h-4"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.5"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M6 18L18 6M6 6l12 12"
+            />
+          </svg>
+        </button>
+      </div>
+
+      <!-- Drawer Body Content -->
+      <div class="px-6 py-4 space-y-4 overflow-y-auto">
+        <div class="space-y-2.5 text-xs text-slate-500">
+          <div class="flex justify-between">
+            <span>Items cost</span>
+            <span class="text-slate-900 font-bold"
+              >{subtotal.toLocaleString()} UGX</span
+            >
+          </div>
+
+          <div class="flex justify-between items-center">
+            <span>Delivery fee</span>
+            {#if shippingFee === 0}
+              <span class="text-emerald-700 font-bold">Free</span>
+            {:else}
+              <span class="text-slate-900 font-bold"
+                >+{shippingFee.toLocaleString()} UGX</span
+              >
+            {/if}
+          </div>
+        </div>
+
+        <!-- Form Completion Helper (Inside the Drawer if fields are missing) -->
+        {#if isPlaceOrderDisabled && appState.cartItems.length > 0}
+          <div
+            class="bg-amber-50 border border-amber-200 rounded-xl p-3 text-[11px] text-amber-800 space-y-1"
+          >
+            <p class="font-bold flex items-center gap-1">
+              <svg
+                class="w-3.5 h-3.5 shrink-0 text-amber-600"
+                fill="currentColor"
+                viewBox="0 0 20 20"
+              >
+                <path
+                  fill-rule="evenodd"
+                  d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                  clip-rule="evenodd"
+                />
+              </svg>
+              Details needed before placing order:
+            </p>
+            <ul class="list-disc list-inside space-y-0.5 text-amber-700">
+              {#if fulfillmentMode === "delivery" && (appState.customerAddresses.length === 0 || !appState.selectedAddressId)}
+                <li>Please select or register a delivery address</li>
+              {/if}
+              {#if fulfillmentMode === "shipping" && (!selectedShippingDestinationId || !receiverNameInput.trim() || !receiverAddressInput.trim() || !receiverPhoneInput.trim() || !receiverCityInput.trim() || !receiverStateInput.trim() || !receiverZipInput.trim())}
+                <li>Please complete international receiver details</li>
+              {/if}
+              {#if paymentType === "card" && !isCardFormValid}
+                <li>Please enter a valid credit card</li>
+              {/if}
+              {#if paymentType === "momo" && !isMomoValid}
+                <li>Please enter a valid mobile number</li>
+              {/if}
+            </ul>
+          </div>
+        {/if}
+
+        <div
+          class="border-t border-slate-200 pt-4 flex justify-between items-baseline"
+        >
+          <span class="text-xs font-bold text-slate-900">Subtotal</span>
+          <span class="text-lg font-extrabold text-slate-900">
+            {Math.max(0, total).toLocaleString()} UGX
+          </span>
+        </div>
+      </div>
+
+      <!-- Drawer Footer Action -->
+      <div class="p-6 pt-0 shrink-0 border-t border-slate-100">
+        <button
+          onclick={() => {
+            isMobileSummaryOpen = false;
+            processOrder();
+          }}
+          disabled={isPlaceOrderDisabled}
+          class="w-full bg-[#0aad0a] hover:bg-[#099409] disabled:bg-slate-200 disabled:text-slate-400 text-white font-extrabold text-xs h-11 rounded-full flex items-center justify-center transition-all shadow-md focus:outline-none cursor-pointer"
+        >
+          Confirm & Place Order
+        </button>
+        <p class="text-[10px] text-slate-400 leading-normal text-center mt-3">
+          By completing checkout, you authorize ePosta package logistics
+          coordinates.
+        </p>
       </div>
     </div>
   {/if}

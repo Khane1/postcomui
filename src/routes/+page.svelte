@@ -28,7 +28,7 @@
   // Dynamic mutually-exclusive categorization of landing page products (Zero duplicates)
   let categorizedProducts = $derived.by(() => {
     // Start with all main products (excluding child variants/variations)
-    const list = appState.allProducts.filter(p => !p.parent_id);
+    const list = appState.allProducts.filter((p) => !p.parent_id);
 
     const processed = [];
     const snacks = [];
@@ -144,16 +144,35 @@
 
     <!-- Conditional retry screen rendered when the main products list fails to load [INDEX] -->
     {#if !appState.isLoading && appState.allProducts.length === 0}
-      <div class="max-w-md mx-auto py-16 px-6 text-center bg-white border border-slate-200/60 rounded-3xl space-y-6 shadow-sm my-8 animate-in fade-in duration-300">
-        <div class="w-14 h-14 bg-rose-50 border border-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto shadow-xs">
-          <svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+      <div
+        class="max-w-md mx-auto py-16 px-6 text-center bg-white border border-slate-200/60 rounded-3xl space-y-6 shadow-sm my-8 animate-in fade-in duration-300"
+      >
+        <div
+          class="w-14 h-14 bg-rose-50 border border-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto shadow-xs"
+        >
+          <svg
+            class="w-7 h-7"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+            />
           </svg>
         </div>
         <div class="space-y-1.5">
-          <h3 class="text-base font-extrabold text-slate-900 tracking-tight">Something went wrong</h3>
-          <p class="text-xs text-slate-500 leading-relaxed max-w-xs mx-auto font-light">
-            We encountered an issue retrieving the products catalog. Please check your network connection and try reloading the page.
+          <h3 class="text-base font-extrabold text-slate-900 tracking-tight">
+            Something went wrong
+          </h3>
+          <p
+            class="text-xs text-slate-500 leading-relaxed max-w-xs mx-auto font-light"
+          >
+            We encountered an issue retrieving the products catalog. Please
+            check your network connection and try reloading the page.
           </p>
         </div>
         <button
@@ -168,25 +187,28 @@
       {#if categorizedProducts.processed.length > 0}
         <div class="space-y-4 pt-4">
           <div
-            class="flex justify-between items-baseline border-b border-slate-100 pb-3"
+            class="flex justify-between items-baseline w-full border-b border-slate-100 pb-3"
           >
-            <div>
-              <h3 class="text-lg font-bold text-slate-900 tracking-tight">
-                Processed products
-              </h3>
+            <div class="w-full">
+              <div class="w-full flex justify-between">
+                <h3 class="text-lg font-bold text-slate-900 tracking-tight">
+                  Processed products
+                </h3>
+                <button
+                  onclick={() => {
+                    appState.selectedCategory = "Food & Beverages";
+                    goto("/products");
+                  }}
+                  class="text-xs font-semibold text-[#0aad0a] hover:text-[#099409] hover:underline cursor-pointer focus:outline-none"
+                >
+                  See all ({categorizedProducts.processed.length}) →
+                </button>
+              </div>
               <p class="text-[13px] text-slate-500 font-light mt-0.5">
-                Premium milled grains, roasted coffees, and organic wellness staples
+                Premium milled grains, roasted coffees, and organic wellness
+                staples
               </p>
             </div>
-            <button
-              onclick={() => {
-                appState.selectedCategory = "Food & Beverages";
-                goto("/products");
-              }}
-              class="text-xs font-semibold text-[#0aad0a] hover:text-[#099409] hover:underline cursor-pointer focus:outline-none"
-            >
-              See all ({categorizedProducts.processed.length}) →
-            </button>
           </div>
 
           <div
@@ -213,25 +235,29 @@
       {#if categorizedProducts.snacks.length > 0}
         <div class="space-y-4 pt-2">
           <div
-            class="flex justify-between items-baseline border-b border-slate-100 pb-3"
+            class="w-full items-baseline border-b border-slate-100 pb-3"
           >
-            <div>
+            <div class="w-full flex justify-between">
               <h3 class="text-lg font-bold text-slate-900 tracking-tight">
                 Snacks
               </h3>
+
+              <button
+                onclick={() => {
+                  appState.selectedCategory = "Food & Beverages";
+                  goto("/products");
+                }}
+                class="text-xs font-semibold text-[#0aad0a] hover:text-[#099409] hover:underline cursor-pointer focus:outline-none"
+              >
+                See all ({categorizedProducts.snacks.length}) →
+              </button>
+            </div>
+            <div>
               <p class="text-[13px] text-slate-500 font-light mt-0.5">
-                Naturally sweet slices, dried fruit bites, and high-energy local crisps
+                Naturally sweet slices, dried fruit bites, and high-energy local
+                crisps
               </p>
             </div>
-            <button
-              onclick={() => {
-                appState.selectedCategory = "Food & Beverages";
-                goto("/products");
-              }}
-              class="text-xs font-semibold text-[#0aad0a] hover:text-[#099409] hover:underline cursor-pointer focus:outline-none"
-            >
-              See all ({categorizedProducts.snacks.length}) →
-            </button>
           </div>
 
           <!-- Horizontal scroll layout -->
@@ -259,15 +285,12 @@
           <div
             class="flex justify-between items-baseline border-b border-slate-100 pb-3"
           >
-            <div>
+            <div class="w-full">
+            <div class="w-full flex justify-between">
               <h3 class="text-lg font-bold text-slate-900 tracking-tight">
                 Apparel
               </h3>
-              <p class="text-[13px] text-slate-500 font-light mt-0.5">
-                Traditional barkcloth bags, handwoven textiles, and heritage accessories
-              </p>
-            </div>
-            <button
+              <button
               onclick={() => {
                 appState.selectedCategory = "Arts & Crafts";
                 goto("/products");
@@ -276,6 +299,13 @@
             >
               See all ({categorizedProducts.apparel.length}) →
             </button>
+            </div>
+              <p class="text-[13px] text-slate-500 font-light mt-0.5">
+                Traditional barkcloth bags, handwoven textiles, and heritage
+                accessories
+              </p>
+            </div>
+            
           </div>
 
           <!-- Horizontal Scroll Container -->

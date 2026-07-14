@@ -65,7 +65,7 @@
     {#each categoryCards as card}
       <button 
         onclick={() => handleCategoryClick(card.id)}
-        class="relative flex flex-col justify-between {card.bg} h-36 sm:h-40 w-[150px] sm:w-full shrink-0 snap-start rounded-2xl overflow-hidden p-4 group transition-all duration-300 transform hover:shadow-md hover:-translate-y-0.5 border border-gray-100 focus:outline-none cursor-pointer"
+        class="relative flex flex-col justify-between {card.bg} h-36 sm:h-40 w-3/4 sm:w-full shrink-0 snap-start rounded-2xl overflow-hidden p-4 group transition-all duration-300 transform hover:shadow-md hover:-translate-y-0.5 border border-gray-100 focus:outline-none cursor-pointer"
       >
         <div class="z-10 text-left max-w-[110px] sm:max-w-[140px]">
           <span class="{card.textColor} text-[13px] sm:text-[17px] font-extrabold tracking-tight block leading-tight">
